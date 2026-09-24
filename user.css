@@ -877,3 +877,70 @@ html.terminal-crt-enabled::before {
   0% { transform: translateY(0); }
   100% { transform: translateY(calc(100vh + 160px)); }
 }
+
+/* ==========================================================================
+   Windows window chrome — every rule here is scoped to html.terminal-os-windows
+   (set by theme.js's platform detection), so Linux/macOS render exactly as
+   before. On Windows, Spotify has no native title bar: its top bar is a
+   `-webkit-app-region: drag` strip and the minimize/maximize/close buttons
+   (~135-150px wide) sit in the window's top-right corner, inside that strip.
+   On Linux the native decorations live outside the page, so none of this
+   applies there.
+   ========================================================================== */
+
+/* Compiling badge: top:12px right:16px lands directly on the close button.
+   Shift it left of the caption buttons, keeping the same top offset so it
+   still reads as part of the top bar the way it does on Linux. It's
+   pointer-events:none and only visible for ~380ms, so sitting inside the
+   drag region is harmless. */
+html.terminal-os-windows #terminal-compiling-badge {
+  right: 150px;
+}
+
+/* Boot + command-palette overlays: both are fixed `inset: 0` layers high
+   above Spotify's top bar, so on Windows they swallow the title-bar area.
+   Worse, the drag strip Chromium computes from the (now hidden) top bar
+   underneath is patchy: Spotify's own back/forward/search/profile buttons
+   are `no-drag` holes, so where you grab during boot decides whether the
+   window moves or the click just lands on the overlay.
+
+   Two options were considered:
+     1. Start the overlays below the title bar (top: ~32px). Rejected: it
+        breaks the boot sequence's full-bleed "nothing but the terminal"
+        moment by exposing a strip of half-mounted Spotify UI, leaves the
+        palette's dim backdrop with an undimmed band, and hard-codes a
+        top-bar height the overlay would then have to track visually.
+     2. Keep full visual coverage and lay an explicit drag strip across the
+        top of each overlay (chosen). Because the overlay is appended at
+        the end of <body>, its drag region is applied after the top bar's
+        no-drag holes and overrides them, giving one uniform, predictable
+        grab area. The caption buttons themselves are hit-tested by the
+        window before any page drag region is consulted, so they keep
+        working even though the strip passes under them. Nothing
+        interactive lives in the top 32px of either overlay (boot text is
+        vertically centered; the palette box starts at 14vh), so no
+        `no-drag` carve-outs are needed. Clicks below the strip still reach
+        the overlay itself, so boot's click-to-skip and the palette's
+        click-outside-to-close keep working unchanged; a mousedown inside
+        the strip becomes a window drag instead, which is exactly what a
+        title bar should do.
+   The strip is absolutely positioned, so it sits outside both overlays'
+   flex layout and moves nothing else; it has no background, so nothing
+   about the overlays' appearance changes either. */
+html.terminal-os-windows #terminal-boot-overlay::before,
+html.terminal-os-windows #terminal-palette-overlay::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 32px;
+  -webkit-app-region: drag;
+}
+
+/* Once the boot overlay starts fading out it stops taking clicks; drop the
+   drag strip at the same moment so the real top bar's no-drag controls
+   work again immediately rather than after the 300ms removal delay. */
+html.terminal-os-windows #terminal-boot-overlay.terminal-boot-hide::before {
+  display: none;
+}
