@@ -20,6 +20,17 @@
 
 	var SESSION_START = Date.now();
 
+	// Same stack as --term-font in user.css — keep the two in sync. The
+	// injected mini-player CSS can't read that variable (it lives in a
+	// separate document), hence the copy. Order matters: the Linux fonts
+	// (JetBrains Mono → DejaVu Sans Mono) come first so a Linux machine
+	// resolves exactly the same face it always has, even if it happens to
+	// have Cascadia installed; Cascadia/Consolas only get reached on
+	// Windows (Menlo on macOS), where none of the Linux faces exist.
+	var TERM_FONT_STACK =
+		"'JetBrains Mono', 'Fira Code', 'Hack', 'DejaVu Sans Mono', " +
+		"'Cascadia Mono', 'Cascadia Code', 'Consolas', 'Menlo', monospace";
+
 	// Real logged-in display name for the palette's `whoami`/`neofetch`/
 	// `sudo` easter egg — reads the actual Spicetify session instead of a
 	// hardcoded name, so it shows *this* user's own account on every
@@ -979,7 +990,7 @@
 			"  --decorative-base: #e6e6e6 !important;",
 			"  --decorative-subdued: #2b2e38 !important;",
 			"}",
-			"* { font-family: 'JetBrains Mono', 'Fira Code', 'Hack', 'DejaVu Sans Mono', monospace !important; }",
+			"* { font-family: " + TERM_FONT_STACK + " !important; }",
 			"body { border: 2px solid #5ebdab; box-sizing: border-box; }",
 			"img.main-image-image, [data-encore-id=\"buttonPrimary\"] { border-radius: 0 !important; }",
 			".x-progressBar-progressFillColor, .x-progressBar-fillColor { background-color: #5ebdab !important; }"
@@ -1721,7 +1732,18 @@
 		if (!ctx || !canvas) return;
 		ctx.fillStyle = "rgba(21, 23, 28, 0.15)";
 		ctx.fillRect(0, 0, canvas.width, canvas.height);
-		ctx.font = matrixState.fontSize + "px " + "monospace";
+		// Generic "monospace" stays FIRST on purpose: on Linux it's what the
+		// rain has always used (fontconfig → DejaVu Sans Mono), so digits and
+		// symbols render identically there. DejaVu has no katakana, so those
+		// glyphs fall through the list per-glyph; on a stock Linux box none
+		// of the named Japanese faces below exist, so they land on the same
+		// system fallback as before. On Windows "monospace" is Consolas (also
+		// no katakana) and the explicit MS Gothic / Yu Gothic / Meiryo give
+		// the rain a proper fixed-width-ish Japanese face instead of whatever
+		// Chromium's generic fallback picks. (A generic family doesn't have
+		// to be last in a font list; later names are still consulted for
+		// any glyph it lacks.)
+		ctx.font = matrixState.fontSize + "px monospace, 'MS Gothic', 'Yu Gothic', 'Meiryo'";
 		// No ctx.shadowBlur (was 3) — verified live (screenshot, ~35s after
 		// trigger, well past any startup transient) that with ~110+ columns
 		// all drawing a glyph every single frame, a blur radius on every one
