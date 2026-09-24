@@ -261,6 +261,12 @@
 		var overlay = document.createElement("div");
 		overlay.id = "terminal-boot-overlay";
 
+		// Window-drag handle for Windows' in-app title bar; display:none on
+		// every other OS (see .terminal-drag-strip in user.css).
+		var dragStrip = document.createElement("div");
+		dragStrip.className = "terminal-drag-strip";
+		overlay.appendChild(dragStrip);
+
 		var logo = document.createElement("pre");
 		logo.className = "terminal-boot-logo";
 		logo.textContent = LOGO;
@@ -1574,7 +1580,8 @@
 			'<div class="terminal-palette-inputRow">' +
 			'<span class="terminal-palette-prompt">&gt;</span>' +
 			'<input class="terminal-palette-input" spellcheck="false" autocomplete="off" placeholder="type a command, or \'help\'" />' +
-			"</div></div>";
+			"</div></div>" +
+			'<div class="terminal-drag-strip"></div>';
 
 		document.body.appendChild(paletteOverlay);
 
