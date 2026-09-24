@@ -33,13 +33,27 @@ Un thème [Spicetify](https://spicetify.app) pour Spotify desktop, esthétique h
 
 ### Manuellement
 
+**Linux / macOS** (bash, zsh) :
+
 ```bash
 git clone https://github.com/jesuisban22-code/spicetify-terminal.git "$(spicetify -c | xargs dirname)/Themes/Terminal"
 spicetify config current_theme Terminal color_scheme terminal
 spicetify apply
 ```
 
-Sur Windows (PowerShell), remplace la première commande par un clone dans `%APPDATA%\spicetify\Themes\Terminal`.
+**Windows** (PowerShell) :
+
+```powershell
+git clone https://github.com/jesuisban22-code/spicetify-terminal.git "$(Split-Path (spicetify -c))\Themes\Terminal"
+spicetify config current_theme Terminal color_scheme terminal
+spicetify apply
+```
+
+Sur Windows, le dossier cible est en général `%APPDATA%\spicetify\Themes\Terminal`.
+
+### Polices
+
+Le thème utilise la première police monospace disponible dans cet ordre : **JetBrains Mono**, Fira Code, Hack, DejaVu Sans Mono, Cascadia Mono, Consolas. Pour le rendu de référence, installe [JetBrains Mono](https://www.jetbrains.com/lp/mono/) sur Linux comme sur Windows. Sans elle, Windows utilise Cascadia Mono (Windows 11 / Windows Terminal) ou Consolas, jamais Courier New.
 
 ## Prérequis
 
