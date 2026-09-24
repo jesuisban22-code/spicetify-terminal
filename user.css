@@ -12,7 +12,10 @@
    ========================================================================== */
 
 :root {
-  --term-font: 'JetBrains Mono', 'Fira Code', 'Hack', 'DejaVu Sans Mono', monospace;
+  /* Linux faces first (unchanged resolution there, even with Cascadia
+     installed); Cascadia/Consolas are the Windows fallbacks, Menlo macOS.
+     Keep in sync with TERM_FONT_STACK in theme.js. */
+  --term-font: 'JetBrains Mono', 'Fira Code', 'Hack', 'DejaVu Sans Mono', 'Cascadia Mono', 'Cascadia Code', 'Consolas', 'Menlo', monospace;
 
   --term-bg: #15171c;
   --term-bg-elevated: #20232c;
