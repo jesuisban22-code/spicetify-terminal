@@ -1015,6 +1015,110 @@
 	}
 
 	// =======================================================================
+	// HiDPI canvas sizing — shared by the visualizer and matrix rain (NOT
+	// the ASCII cover-art canvas, which is deliberately a tiny grid blown
+	// up with image-rendering:pixelated and must stay that way).
+	// A canvas' backing store is in *device* pixels, but everything here
+	// was written (on Linux, devicePixelRatio 1) in CSS pixels. At
+	// Windows' usual 125%/150% scaling that mismatch means a 300px-wide
+	// backing store stretched over 375/450 physical pixels — soft, smeared
+	// bars and glyphs. Fix: size the backing store to cssSize * dpr and
+	// pre-scale the context by dpr, so all drawing code keeps talking CSS
+	// pixels and just comes out sharp. At dpr 1 this is exactly the old
+	// behavior: width/height = the CSS size, identity transform.
+	// Assigning canvas.width/height (even to the same value) clears the
+	// canvas and resets the context state, transform included, so the
+	// transform is reapplied here every time — callers must always resize
+	// through this helper, never by touching canvas.width directly.
+	// setStyle: also pin the CSS size inline, for canvases with no CSS
+	// width/height of their own (matrix rain — a replaced element's
+	// displayed size otherwise follows its backing store, which would make
+	// it dpr times too big). Leave it off when user.css already sizes the
+	// canvas (.terminal-visualizer), so the stylesheet stays in charge.
+	// Stashes the logical size on the element (_cssW/_cssH) — drawing code
+	// reads those, never canvas.width/height. Returns the dpr used.
+	// =======================================================================
+	function currentDpr() {
+		var dpr = window.devicePixelRatio || 1;
+		return dpr > 0 && isFinite(dpr) ? dpr : 1;
+	}
+
+	function sizeCanvasForDpr(canvas, cssW, cssH, setStyle) {
+		var dpr = currentDpr();
+		canvas.width = Math.max(1, Math.round(cssW * dpr));
+		canvas.height = Math.max(1, Math.round(cssH * dpr));
+		if (setStyle) {
+			canvas.style.width = cssW + "px";
+			canvas.style.height = cssH + "px";
+		}
+		canvas._cssW = cssW;
+		canvas._cssH = cssH;
+		canvas._dpr = dpr;
+		var ctx = canvas.getContext("2d");
+		if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+		return dpr;
+	}
+
+	// True when the backing store no longer matches cssW x cssH at the
+	// current dpr (panel resized, or window moved to a monitor with a
+	// different scale factor).
+	function canvasNeedsDprResize(canvas, cssW, cssH) {
+		var dpr = currentDpr();
+		return (
+			canvas._dpr !== dpr ||
+			canvas._cssW !== cssW ||
+			canvas._cssH !== cssH ||
+			canvas.width !== Math.max(1, Math.round(cssW * dpr)) ||
+			canvas.height !== Math.max(1, Math.round(cssH * dpr))
+		);
+	}
+
+	// Calls cb each time devicePixelRatio changes (window dragged to a
+	// monitor with a different scale, or zoom). A resolution media query
+	// only matches one exact value, so after every change the listener is
+	// re-armed against the *new* dpr. Returns a cancel() function.
+	function onDprChange(cb) {
+		var mql = null;
+		var cancelled = false;
+		function handler() {
+			disarm();
+			if (cancelled) return;
+			cb();
+			arm();
+		}
+		function arm() {
+			if (!window.matchMedia) return;
+			mql = window.matchMedia("(resolution: " + currentDpr() + "dppx)");
+			if (mql.addEventListener) mql.addEventListener("change", handler);
+			else if (mql.addListener) mql.addListener(handler);
+		}
+		function disarm() {
+			if (!mql) return;
+			if (mql.removeEventListener) mql.removeEventListener("change", handler);
+			else if (mql.removeListener) mql.removeListener(handler);
+			mql = null;
+		}
+		arm();
+		return function cancel() {
+			cancelled = true;
+			disarm();
+		};
+	}
+
+	// Clears/fills the *entire* backing store regardless of the dpr
+	// transform. Math.round(cssW * dpr) can exceed cssW * dpr by up to half
+	// a device pixel, and a CSS-space rect would leave that edge sliver only
+	// partly covered (e.g. a ghost column in the matrix trail). At dpr 1
+	// this is identical to fillRect/clearRect(0, 0, canvas.width, canvas.height).
+	function paintWholeCanvas(ctx, canvas, clear) {
+		ctx.save();
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		if (clear) ctx.clearRect(0, 0, canvas.width, canvas.height);
+		else ctx.fillRect(0, 0, canvas.width, canvas.height);
+		ctx.restore();
+	}
+
+	// =======================================================================
 	// Frequency visualizer — real per-instant audio data, not a generic
 	// pulse. Spotify's internal audio-analysis endpoint (confirmed reachable
 	// live via Spicetify.CosmosAsync — the same one the official desktop
@@ -1082,16 +1186,19 @@
 			if (canvas && canvas.isConnected && canvas.parentNode === cover.parentNode) {
 				// Resync width if the panel was resized — the canvas'
 				// internal resolution otherwise stays locked to whatever it
-				// was at creation time.
+				// was at creation time. Also catches a dpr change (window
+				// moved to a differently-scaled monitor), since this runs
+				// every frame anyway — no separate listener needed here.
 				var targetW = Math.max(64, cover.clientWidth || 260);
-				if (canvas.width !== targetW) canvas.width = targetW;
+				if (canvasNeedsDprResize(canvas, targetW, 64)) sizeCanvasForDpr(canvas, targetW, 64, false);
 				return canvas;
 			}
 			if (canvas && canvas.parentNode) canvas.parentNode.removeChild(canvas);
 			canvas = document.createElement("canvas");
 			canvas.className = "terminal-visualizer";
-			canvas.width = Math.max(64, cover.clientWidth || 260);
-			canvas.height = 64;
+			// Displayed size comes from user.css (width:100%; height:64px),
+			// so no inline style — only the backing store is dpr-scaled.
+			sizeCanvasForDpr(canvas, Math.max(64, cover.clientWidth || 260), 64, false);
 			cover.parentNode.insertBefore(canvas, cover.nextSibling);
 			return canvas;
 		}
@@ -1198,8 +1305,9 @@
 			if (item && item.uri !== currentUri) rebuildBases(item.uri);
 
 			var ctx = canvas.getContext("2d");
-			var w = canvas.width, h = canvas.height;
-			ctx.clearRect(0, 0, w, h);
+			// Logical (CSS-pixel) size — the context is pre-scaled by dpr.
+			var w = canvas._cssW, h = canvas._cssH;
+			paintWholeCanvas(ctx, canvas, true);
 			// No ctx.shadowBlur here (was 4) — a shadow forces the canvas to
 			// re-rasterize a blur kernel on *every single* fillRect call, and
 			// this draws up to 48 of them per frame at 60fps. That's one of
@@ -1693,16 +1801,22 @@
 		matrixState.canvas = canvas;
 		matrixState.ctx = canvas.getContext("2d");
 
+		// #terminal-matrix-rain is position:fixed; inset:0 but has no CSS
+		// width/height, and a canvas is a replaced element — its displayed
+		// size would follow the (dpr-scaled) backing store — so pin the CSS
+		// size inline (setStyle = true). Same size as before at dpr 1.
 		function resize() {
-			canvas.width = window.innerWidth;
-			canvas.height = window.innerHeight;
+			sizeCanvasForDpr(canvas, window.innerWidth, window.innerHeight, true);
 		}
 		resize();
 		window.addEventListener("resize", resize);
 		matrixState.resize = resize;
+		// Resizing wipes the canvas, which the fading trail recovers from
+		// on its own within a few frames, so a dpr change just re-sizes.
+		matrixState.cancelDprWatch = onDprChange(resize);
 
 		var fontSize = 14;
-		var columns = Math.floor(canvas.width / fontSize);
+		var columns = Math.floor(canvas._cssW / fontSize);
 		matrixState.drops = new Array(columns).fill(1);
 		matrixState.fontSize = fontSize;
 
@@ -1720,7 +1834,7 @@
 		var canvas = matrixState.canvas;
 		if (!ctx || !canvas) return;
 		ctx.fillStyle = "rgba(21, 23, 28, 0.15)";
-		ctx.fillRect(0, 0, canvas.width, canvas.height);
+		paintWholeCanvas(ctx, canvas, false);
 		ctx.font = matrixState.fontSize + "px " + "monospace";
 		// No ctx.shadowBlur (was 3) — verified live (screenshot, ~35s after
 		// trigger, well past any startup transient) that with ~110+ columns
@@ -1737,7 +1851,7 @@
 			// reads as the "hot" leading edge of a drop, like real chafa/cmatrix.
 			ctx.fillStyle = Math.random() > 0.94 ? "#d6fff5" : "#5ebdab";
 			ctx.fillText(text, i * matrixState.fontSize, y);
-			if (y > canvas.height && Math.random() > 0.97) {
+			if (y > canvas._cssH && Math.random() > 0.97) {
 				matrixState.drops[i] = 0;
 			}
 			matrixState.drops[i] += settings.matrixRainSpeed || 1;
@@ -1748,6 +1862,8 @@
 	function stopMatrixRain() {
 		if (matrixState.rafId) cancelAnimationFrame(matrixState.rafId);
 		if (matrixState.resize) window.removeEventListener("resize", matrixState.resize);
+		if (matrixState.cancelDprWatch) matrixState.cancelDprWatch();
+		matrixState.cancelDprWatch = null;
 		if (matrixState.canvas && matrixState.canvas.parentNode) {
 			matrixState.canvas.parentNode.removeChild(matrixState.canvas);
 		}
