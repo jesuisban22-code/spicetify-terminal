@@ -894,7 +894,7 @@ html.terminal-crt-enabled::before {
    pointer-events:none and only visible for ~380ms, so sitting inside the
    drag region is harmless. */
 html.terminal-os-windows #terminal-compiling-badge {
-  right: 150px;
+  right: 190px; /* caption buttons ~138 physical px; covers Spotify zoom down to ~70% */
 }
 
 /* Boot + command-palette overlays: both are fixed `inset: 0` layers high

@@ -224,12 +224,6 @@
 		}
 	}
 
-	// For JS-side checks elsewhere in this file. A function rather than a
-	// snapshot var so it reflects the re-evaluation below.
-	function IS_WINDOWS() {
-		return currentOs === "windows";
-	}
-
 	applyOsClass();
 	waitFor(
 		function () { return window.Spicetify && Spicetify.Platform && Spicetify.Platform.operatingSystem; },
@@ -1284,7 +1278,11 @@
 				// was at creation time. Also catches a dpr change (window
 				// moved to a differently-scaled monitor), since this runs
 				// every frame anyway — no separate listener needed here.
-				var targetW = Math.max(64, cover.clientWidth || 260);
+				// Sized from the canvas' own displayed width (user.css gives
+				// it width:100% of the parent, which can be wider than the
+				// cover); sizing from the cover stretched the bars and
+				// cancelled out the dpr-crisp backing store.
+				var targetW = Math.max(64, canvas.clientWidth || cover.clientWidth || 260);
 				if (canvasNeedsDprResize(canvas, targetW, 64)) sizeCanvasForDpr(canvas, targetW, 64, false);
 				return canvas;
 			}
@@ -1293,8 +1291,9 @@
 			canvas.className = "terminal-visualizer";
 			// Displayed size comes from user.css (width:100%; height:64px),
 			// so no inline style — only the backing store is dpr-scaled.
-			sizeCanvasForDpr(canvas, Math.max(64, cover.clientWidth || 260), 64, false);
 			cover.parentNode.insertBefore(canvas, cover.nextSibling);
+			// Sized after insertion so clientWidth reflects the real layout.
+			sizeCanvasForDpr(canvas, Math.max(64, canvas.clientWidth || cover.clientWidth || 260), 64, false);
 			return canvas;
 		}
 
@@ -1552,10 +1551,12 @@
 		// Ctrl+Shift+K, not Ctrl+` — a symbol key's physical position (and
 		// its `code` value) can differ across keyboard layouts (AZERTY vs
 		// QWERTY), which made the original backtick binding unreliable.
-		// Letter keys keep the same `code` (KeyK) regardless of layout, so
-		// this combo is layout-independent.
+		// `code` is the physical key: KeyK types "k" on QWERTY, AZERTY and
+		// QWERTZ alike (not on Dvorak). Alt is excluded because Windows
+		// reports AltGr as Ctrl+Alt, so AltGr+Shift+K on some layouts
+		// would otherwise open the palette while typing a character.
 		document.addEventListener("keydown", function (e) {
-			if (e.ctrlKey && e.shiftKey && e.code === "KeyK") {
+			if (e.ctrlKey && e.shiftKey && !e.altKey && e.code === "KeyK") {
 				if (!settings.palette) return;
 				e.preventDefault();
 				toggleCommandPalette();
@@ -1901,8 +1902,19 @@
 		// width/height, and a canvas is a replaced element — its displayed
 		// size would follow the (dpr-scaled) backing store — so pin the CSS
 		// size inline (setStyle = true). Same size as before at dpr 1.
+		var fontSize = 14;
+		matrixState.fontSize = fontSize;
+		matrixState.drops = [];
+		// Column count follows the width: a wider window (maximize, move to
+		// a bigger monitor) gets new columns on the right instead of an
+		// empty band; a narrower one drops the extras. Existing columns keep
+		// their position so the rain doesn't visibly restart.
 		function resize() {
 			sizeCanvasForDpr(canvas, window.innerWidth, window.innerHeight, true);
+			var columns = Math.floor(canvas._cssW / fontSize);
+			var drops = matrixState.drops;
+			if (drops.length > columns) drops.length = columns;
+			while (drops.length < columns) drops.push(1);
 		}
 		resize();
 		window.addEventListener("resize", resize);
@@ -1910,11 +1922,6 @@
 		// Resizing wipes the canvas, which the fading trail recovers from
 		// on its own within a few frames, so a dpr change just re-sizes.
 		matrixState.cancelDprWatch = onDprChange(resize);
-
-		var fontSize = 14;
-		var columns = Math.floor(canvas._cssW / fontSize);
-		matrixState.drops = new Array(columns).fill(1);
-		matrixState.fontSize = fontSize;
 
 		requestAnimationFrame(function () {
 			canvas.classList.add("terminal-matrix-visible");
