@@ -147,6 +147,84 @@
 		}, 200);
 	}
 
+	// ---------------------------------------------------------------------
+	// Platform detection — tags <html> with exactly one of
+	// terminal-os-windows / terminal-os-linux / terminal-os-mac so user.css
+	// can scope OS-specific fixes (Windows' in-page window buttons and
+	// title-bar drag region) without touching how any other OS renders.
+	// The theme was built on Linux, where native window decorations sit
+	// outside the page entirely; every Windows-only rule in user.css is
+	// gated on html.terminal-os-windows, so Linux (and an OS we fail to
+	// identify, which gets no class at all) stays pixel-identical.
+	//
+	// Sources, most to least authoritative:
+	//   1. Spicetify.Platform.operatingSystem — what Spotify itself reports
+	//      (also shown by the palette's `neofetch`), but Platform may not
+	//      exist yet at the very first line of this file.
+	//   2. Spotify's own body class (spotify__os--is-windows etc.), set by
+	//      the desktop client before its React tree mounts.
+	//   3. navigator.userAgent / navigator.platform — always available, so
+	//      the boot overlay (which runs synchronously below) already gets
+	//      the right class on its first paint.
+	// We apply the best answer immediately, then re-evaluate once Platform
+	// is ready in case an earlier fallback guessed differently.
+	// ---------------------------------------------------------------------
+	var OS_CLASSES = { windows: "terminal-os-windows", linux: "terminal-os-linux", mac: "terminal-os-mac" };
+	var currentOs = "unknown";
+
+	// Maps any free-form OS string onto windows/linux/mac. Mac is tested
+	// before Windows on purpose: "Darwin" contains the substring "win".
+	function normalizeOs(s) {
+		s = String(s || "").toLowerCase();
+		if (!s) return "unknown";
+		if (/mac|os ?x|darwin/.test(s)) return "mac";
+		if (/win/.test(s)) return "windows";
+		if (/linux|x11|cros/.test(s)) return "linux";
+		return "unknown";
+	}
+
+	function detectOs() {
+		var os = "unknown";
+		try {
+			os = normalizeOs(Spicetify.Platform && Spicetify.Platform.operatingSystem);
+		} catch (e) {
+			/* Spicetify global not there yet — fall through */
+		}
+		if (os !== "unknown") return os;
+		try {
+			var m = document.body && /(?:^|\s)spotify__os--is-([a-z]+)/.exec(document.body.className);
+			if (m) os = normalizeOs(m[1]);
+		} catch (e) {
+			/* no body yet — fall through */
+		}
+		if (os !== "unknown") return os;
+		return normalizeOs(navigator.platform) !== "unknown"
+			? normalizeOs(navigator.platform)
+			: normalizeOs(navigator.userAgent);
+	}
+
+	function applyOsClass() {
+		currentOs = detectOs();
+		var root = document.documentElement;
+		for (var k in OS_CLASSES) {
+			if (Object.prototype.hasOwnProperty.call(OS_CLASSES, k)) {
+				root.classList.toggle(OS_CLASSES[k], k === currentOs);
+			}
+		}
+	}
+
+	// For JS-side checks elsewhere in this file. A function rather than a
+	// snapshot var so it reflects the re-evaluation below.
+	function IS_WINDOWS() {
+		return currentOs === "windows";
+	}
+
+	applyOsClass();
+	waitFor(
+		function () { return window.Spicetify && Spicetify.Platform && Spicetify.Platform.operatingSystem; },
+		applyOsClass
+	);
+
 	// =======================================================================
 	// A. Boot sequence — the one bold, non-user-triggered moment. Pure DOM,
 	//    zero Spicetify dependency, so it can run on the very first paint.
