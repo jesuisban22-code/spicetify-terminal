@@ -744,9 +744,26 @@
 			var h = Math.max(16, container.clientHeight || 96);
 			var rows = Math.max(4, Math.round(cols * (h / w)));
 
+			// Spicetify virtualizes track lists / card grids and *recycles*
+			// row DOM on scroll: the same container (and often the same <img>)
+			// gets a new src while an earlier probe is still in flight. Loads
+			// can resolve out of order (old, slow src landing after the new,
+			// fast one), which used to paint the previous row's cover onto the
+			// recycled row. container._terminalAsciiSrc doubles as the "which
+			// src is this container supposed to show" token: a probe only draws
+			// if it's still the requested src AND the live <img> still points
+			// at it. Pure DOM/JS, no platform-specific behavior.
+			function isStale() {
+				if (container._terminalAsciiSrc !== srcUrl) return true;
+				var liveImg = container.querySelector("img");
+				if (!liveImg) return true;
+				return (liveImg.currentSrc || liveImg.src) !== srcUrl && liveImg.src !== srcUrl;
+			}
+
 			var probe = new Image();
 			probe.crossOrigin = "anonymous";
 			probe.onload = function () {
+				if (isStale()) return;
 				try {
 					// Stage 1: let the canvas do a high-quality resize down to a
 					// fixed, moderate intermediate buffer — cheap and avoids
@@ -837,6 +854,9 @@
 				}
 			};
 			probe.onerror = function () {
+				// Only clear the token if it's still ours — a stale probe's
+				// failure mustn't force a redundant re-render of the new src.
+				if (container._terminalAsciiSrc !== srcUrl) return;
 				container._terminalAsciiSrc = null; // allow retry on next pass
 			};
 			probe.src = srcUrl;
@@ -933,13 +953,16 @@
 		// finishes an async fetch and mounts well after both the route
 		// change and the retry window above. Observe the main view for any
 		// subtree growth and re-scan, debounced so a big list mount (e.g.
-		// scrolling Liked Songs) only triggers one pass.
+		// scrolling Liked Songs) only triggers one pass. Also watches img
+		// src/srcset attribute changes: recycled virtualized rows keep the
+		// same <img> node and just swap its src, which a childList-only
+		// observer never sees — the row would keep the previous cover's art.
 		var mainView = document.querySelector(".Root__main-view") || document.querySelector("#main") || document.body;
 		var mutTimer = null;
 		new MutationObserver(function () {
 			clearTimeout(mutTimer);
 			mutTimer = setTimeout(renderAll, 250);
-		}).observe(mainView, { childList: true, subtree: true });
+		}).observe(mainView, { childList: true, subtree: true, attributes: true, attributeFilter: ["src", "srcset"] });
 
 		renderWithRetries();
 	}
