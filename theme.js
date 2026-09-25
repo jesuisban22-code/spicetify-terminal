@@ -15,6 +15,12 @@
 (function TerminalTheme() {
 	"use strict";
 
+	// Run once per page: the theme can be loaded twice (Marketplace's
+	// jsDelivr include plus a local inject_theme_js copy). A second copy
+	// would stack a second boot overlay and double every listener below.
+	if (window.__spicetifyTerminalThemeLoaded) return;
+	window.__spicetifyTerminalThemeLoaded = true;
+
 	var REDUCED_MOTION =
 		window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -28,7 +34,7 @@
 	// have Cascadia installed; Cascadia/Consolas only get reached on
 	// Windows (Menlo on macOS), where none of the Linux faces exist.
 	// Shown by the boot log and `neofetch`; keep in sync with CHANGELOG.md.
-	var THEME_VERSION = "1.1.1";
+	var THEME_VERSION = "1.1.2";
 
 	var TERM_FONT_STACK =
 		"'JetBrains Mono', 'Fira Code', 'Hack', 'DejaVu Sans Mono', " +
@@ -239,6 +245,13 @@
 	// =======================================================================
 	function runBootSequence() {
 		if (!settings.boot) return;
+		// Idempotent: the theme JS can be injected twice (local theme.js +
+		// Marketplace's include URL). One overlay is enough.
+		if (document.getElementById("terminal-boot-overlay")) return;
+		if (!document.body) {
+			document.addEventListener("DOMContentLoaded", runBootSequence);
+			return;
+		}
 
 		var LOGO = [
 			" _____              _           _ ",
@@ -292,7 +305,13 @@
 				if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
 			}, 300);
 			document.removeEventListener("keydown", dismiss);
+			document.removeEventListener("visibilitychange", onVisibilityChange);
 			overlay.removeEventListener("click", dismiss);
+		}
+
+		var last = 0;
+		function onVisibilityChange() {
+			last = performance.now();
 		}
 
 		document.addEventListener("keydown", dismiss);
@@ -307,43 +326,89 @@
 		}
 
 		// Type out each line, then blink a cursor briefly, then fade out.
-		// Hard-capped at ~2s total regardless of how far the typing got.
-		var lineIndex = 0;
-		var charIndex = 0;
-		var currentLineEl = null;
+		// Progress is derived from elapsed *visible* time, not from how many
+		// timers have fired: Chromium clamps timers to 1/s while the window is
+		// hidden/occluded/minimized (Spotify often starts that way on Windows)
+		// and Spotify's own startup blocks the main thread for seconds, so a
+		// 10ms-per-char timer chain used to crawl and then get cut mid-line
+		// by the safety net. Now a late tick just catches up, and whatever
+		// ends the sequence always shows the full log first.
+		var CHAR_MS = 10;
+		var LINE_GAP_MS = 90;
+		var HOLD_MS = 700; // cursor blink before the fade
+		var SAFETY_MS = 3200; // hard cap on visible time
+		var NEVER_SHOWN_MS = 8000; // window never shown: drop silently
 
-		function typeNext() {
-			if (dismissed) return;
-			if (lineIndex >= LINES.length) {
-				var cursor = document.createElement("span");
-				cursor.className = "terminal-boot-cursor";
-				cursor.textContent = "█";
-				log.appendChild(cursor);
-				timers.push(setTimeout(dismiss, 700));
-				return;
+		var lineStarts = [];
+		var lineEls = [];
+		var typeEnd = 0;
+		LINES.forEach(function (line) {
+			lineStarts.push(typeEnd);
+			typeEnd += (line.length - 1) * CHAR_MS + LINE_GAP_MS;
+			var el = document.createElement("div");
+			if (line.indexOf("OK") !== -1 || line === "ready.") el.className = "ok";
+			lineEls.push(el);
+		});
+		var cursor = document.createElement("span");
+		cursor.className = "terminal-boot-cursor";
+		cursor.textContent = "\u2588";
+
+		function render(elapsed) {
+			for (var i = 0; i < LINES.length; i++) {
+				if (elapsed < lineStarts[i]) break;
+				var n = Math.min(LINES[i].length, Math.floor((elapsed - lineStarts[i]) / CHAR_MS) + 1);
+				if (!lineEls[i].parentNode) log.appendChild(lineEls[i]);
+				if (lineEls[i].textContent.length !== n) lineEls[i].textContent = LINES[i].slice(0, n);
 			}
-			var line = LINES[lineIndex];
-			if (charIndex === 0) {
-				currentLineEl = document.createElement("div");
-				if (line.indexOf("OK") !== -1 || line === "ready.") {
-					currentLineEl.className = "ok";
-				}
-				log.appendChild(currentLineEl);
-			}
-			charIndex++;
-			currentLineEl.textContent = line.slice(0, charIndex);
-			if (charIndex >= line.length) {
-				lineIndex++;
-				charIndex = 0;
-				timers.push(setTimeout(typeNext, 90));
-			} else {
-				timers.push(setTimeout(typeNext, 10));
-			}
+			if (elapsed >= typeEnd && !cursor.parentNode) log.appendChild(cursor);
 		}
-		typeNext();
 
-		// Absolute safety net: never let this block the app for more than ~3.2s.
-		timers.push(setTimeout(dismiss, 3200));
+		var started = false;
+		var elapsed = 0;
+		var finishing = false;
+		var doneAt = null;
+
+		function isVisible() {
+			return document.visibilityState !== "hidden";
+		}
+
+		// Complete every line at once, hold briefly, then fade — never cut
+		// the log mid-line.
+		function finish(holdMs) {
+			if (dismissed || finishing) return;
+			finishing = true;
+			render(typeEnd);
+			timers.push(setTimeout(dismiss, holdMs));
+		}
+
+		function tick() {
+			if (dismissed || finishing) return;
+			var now = performance.now();
+			if (!started) {
+				if (!isVisible()) {
+					timers.push(setTimeout(tick, 50));
+					return;
+				}
+				started = true;
+				last = now;
+				timers.push(setTimeout(function () { finish(300); }, SAFETY_MS));
+			}
+			// Only visible time moves the animation forward.
+			if (isVisible()) elapsed += now - last;
+			last = now;
+			render(elapsed);
+			// Hold measured from when the full log was actually on screen, so
+			// a long main-thread stall can't skip straight past it.
+			if (doneAt === null && elapsed >= typeEnd) doneAt = elapsed;
+			if (doneAt !== null && elapsed >= doneAt + HOLD_MS) return dismiss();
+			timers.push(setTimeout(tick, 16));
+		}
+
+		document.addEventListener("visibilitychange", onVisibilityChange);
+		timers.push(setTimeout(function () {
+			if (!started) dismiss();
+		}, NEVER_SHOWN_MS));
+		tick();
 	}
 
 	function escapeHtml(s) {

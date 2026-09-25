@@ -5,6 +5,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] - 2026-09-25
+
+### Fixed
+
+- Boot sequence: the log could fade out mid-line ("the text loads but never
+  finishes") when Spotify started busy, hidden or behind other windows. Typing
+  used one timer per character while the 3.2s safety net counted wall-clock
+  time, so any timer delay (Windows' 15.6ms timer granularity, a busy main
+  thread during startup, ~1s timers in a hidden window) let the cutoff win.
+  Progress is now computed from elapsed visible time, the animation waits
+  until the window is actually shown, and the safety net completes the text
+  and holds it briefly instead of cutting it.
+- The theme script now runs only once per page, even if it is injected twice
+  (Marketplace include plus a local copy), so there is a single boot overlay
+  and no doubled listeners.
+
 ## [1.1.1] - 2026-09-25
 
 ### Fixed
@@ -69,6 +85,7 @@ Initial release (Linux).
   the progress bar, vim-style keyboard navigation, themed mini-player.
 - Settings panel to toggle every feature individually.
 
+[1.1.2]: https://github.com/jesuisban22-code/spicetify-terminal/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/jesuisban22-code/spicetify-terminal/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/jesuisban22-code/spicetify-terminal/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/jesuisban22-code/spicetify-terminal/releases/tag/v1.0.0
