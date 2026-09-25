@@ -1015,6 +1015,843 @@ html.terminal-full {
 }
 
 /* --- FULL/SHELL (agent A) ------------------------------------------------ */
+/* Global layout, top bar, library, scrollbars, resize handles.
+   Spotify's three rounded floating panels become tmux panes: square, a 1px
+   frame, a title bar holding [n:name], and the pane under the pointer (or,
+   when nothing is hovered, the one holding focus) turns green. */
+
+html.terminal-full {
+  --tf-shell-gutter: var(--term-bg-tinted-press);   /* between panes */
+  --tf-shell-title-bg: var(--term-bg-tinted);       /* pane title bars */
+  --tf-shell-line: var(--term-border);              /* pane frames */
+}
+
+/* ---------- 1. Panes ------------------------------------------------------
+   Gutters keep Spotify's own --panel-gap on purpose. It also sets the
+   outer padding of the whole grid, i.e. how far the top bar's right end
+   sits from the window edge, and on Windows that is where the caption
+   buttons are drawn: shrinking it would push the top bar's content 2px
+   closer to them. The gutter just gets darker than the panes instead. */
+html.terminal-full .Root__top-container {
+  background-color: var(--tf-shell-gutter) !important;
+}
+
+/* The frame. The title bar is the pane's own top BORDER (22px), not
+   padding and not a child: Spotify positions absolute children (the main
+   view's sticky top bar, the resize handles) from the padding box, which
+   starts below the border, so they all move down with the content instead
+   of sliding under the title. The border's three colors (outer line, title
+   fill, separator line) come from one border-image gradient; the slice
+   "22" must match --tf-title-h. Right sidebar only once it has content:
+   when closed its column is ~0px wide and a frame would draw a stray
+   sliver. */
+html.terminal-full .Root__nav-bar,
+html.terminal-full .Root__main-view,
+html.terminal-full .Root__right-sidebar:has(aside:not(:empty)) {
+  --tf-pane-line: var(--tf-shell-line);
+  box-sizing: border-box !important;
+  border-style: solid !important;
+  border-width: var(--tf-title-h) 1px 1px 1px !important;
+  border-color: var(--tf-pane-line) !important;
+  border-image: linear-gradient(
+      to bottom,
+      var(--tf-pane-line) 0, var(--tf-pane-line) 1px,
+      var(--tf-shell-title-bg) 1px, var(--tf-shell-title-bg) calc(var(--tf-title-h) - 1px),
+      var(--tf-pane-line) calc(var(--tf-title-h) - 1px), var(--tf-pane-line) 100%
+    ) 22 1 1 1 / var(--tf-title-h) 1px 1px 1px !important;
+  border-radius: 0 !important;
+  background-color: var(--term-bg) !important;
+  box-shadow: none !important;
+}
+
+/* Active pane: hovered, else focused (so two panes never light up at once:
+   the one under the pointer wins over the one holding keyboard focus). */
+html.terminal-full :is(.Root__nav-bar, .Root__main-view, .Root__right-sidebar):hover,
+html.terminal-full .Root__top-container:not(:has(:is(.Root__nav-bar, .Root__main-view, .Root__right-sidebar):hover)) :is(.Root__nav-bar, .Root__main-view, .Root__right-sidebar):focus-within {
+  --tf-pane-line: var(--term-green);
+}
+
+/* Title text. position:fixed with top/left left at auto keeps the box at
+   its static position (top-left of the pane's content box) while escaping
+   the pane's overflow:hidden, which would otherwise clip anything drawn in
+   the border area; the negative top margin lifts it into the title bar.
+   Same technique the spicetify "text" theme uses for its pane labels. */
+html.terminal-full .Root__nav-bar::before,
+html.terminal-full .Root__main-view::before,
+html.terminal-full .Root__right-sidebar:has(aside:not(:empty))::before {
+  position: fixed;
+  z-index: 3;
+  margin: calc(var(--tf-title-h) * -1 + 3px) 0 0 6px;
+  padding: 0 6px;
+  height: calc(var(--tf-title-h) - 6px);
+  line-height: calc(var(--tf-title-h) - 6px);
+  font-family: var(--term-font);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+  white-space: nowrap;
+  color: var(--term-subdued);
+  background: transparent;
+  pointer-events: none;
+  animation: tf-shell-title-in var(--tf-slow) steps(4, end) backwards;
+}
+
+html.terminal-full .Root__nav-bar::before {
+  content: "[0:~/library]";
+  animation-delay: 60ms;
+}
+
+html.terminal-full .Root__main-view::before {
+  content: var(--tf-main-title, "[1:~/home]");
+  animation-delay: 120ms;
+}
+
+html.terminal-full .Root__right-sidebar {
+  --tf-right-title: "[2:now-playing]";
+}
+html.terminal-full .Root__right-sidebar:has(#queue-panel, [data-testid="queue-page"]) {
+  --tf-right-title: "[2:queue]";
+}
+html.terminal-full .Root__right-sidebar:has([data-testid="buddy-feed"]) {
+  --tf-right-title: "[2:friends]";
+}
+html.terminal-full .Root__right-sidebar:has(aside:not(:empty))::before {
+  content: var(--tf-right-title);
+  animation-delay: 180ms;
+}
+
+/* Collapsed library rail is ~72px: the full label would spill over the
+   main pane's title. */
+html.terminal-full .Root__nav-bar:has(.main-yourLibraryX-libraryIsCollapsed)::before {
+  content: "[0]";
+}
+
+/* Active title: inverse video + a short stepped reveal each time the pane
+   becomes active (the animation restarts because the rule starts matching). */
+html.terminal-full :is(.Root__nav-bar, .Root__main-view, .Root__right-sidebar):hover::before,
+html.terminal-full .Root__top-container:not(:has(:is(.Root__nav-bar, .Root__main-view, .Root__right-sidebar):hover)) :is(.Root__nav-bar, .Root__main-view, .Root__right-sidebar):focus-within::before {
+  color: var(--term-bg);
+  background: var(--term-green);
+  animation: tf-shell-title-active var(--tf-med) steps(3, end);
+}
+
+@keyframes tf-shell-title-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes tf-shell-title-active {
+  from { opacity: 0.35; transform: translateX(-6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Panes fade in on load, staggered left to right. Opacity only: a
+   transform on the pane would make it the containing block of its fixed
+   title and clip it for the duration. `backwards` so nothing lingers
+   (no stacking context, no compositing) once it has played. */
+html.terminal-full .Root__globalNav,
+html.terminal-full .Root__nav-bar,
+html.terminal-full .Root__main-view,
+html.terminal-full .Root__right-sidebar {
+  animation: tf-shell-pane-in var(--tf-slow) var(--tf-ease) backwards;
+}
+html.terminal-full .Root__nav-bar { animation-delay: 60ms; }
+html.terminal-full .Root__main-view { animation-delay: 120ms; }
+html.terminal-full .Root__right-sidebar { animation-delay: 180ms; }
+
+@keyframes tf-shell-pane-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Inner surfaces that carried the panel's rounding and its own fill. */
+html.terminal-full :is(.Root__globalNav, .Root__nav-bar) :is(*, *::before, *::after),
+html.terminal-full .Root__main-view > *,
+html.terminal-full .main-view-container,
+html.terminal-full .Root__right-sidebar > *,
+html.terminal-full .Root__right-sidebar aside,
+html.terminal-full #Desktop_PanelContainer_Id {
+  border-radius: 0 !important;
+}
+
+html.terminal-full .Root__nav-bar :is(.main-yourLibraryX-entryPoints, .main-yourLibraryX-library, .main-yourLibraryX-libraryContainer) {
+  background-color: var(--term-bg) !important;
+  box-shadow: none !important;
+}
+
+/* ---------- 1b. Resize handles: a thin │ rule in the gutter --------------
+   The handle element keeps Spotify's size and position (its hit area);
+   only the line it draws changes. */
+html.terminal-full .LayoutResizer__resize-bar {
+  cursor: col-resize;
+}
+
+html.terminal-full .LayoutResizer__resize-bar::after {
+  background-color: var(--term-green) !important;
+  width: 1px !important;
+  border-radius: 0 !important;
+  opacity: 0;
+  transition: opacity var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .LayoutResizer__resize-bar:hover::after,
+html.terminal-full .LayoutResizer__resize-bar--resizing::after,
+html.terminal-full .LayoutResizer__resize-bar:focus-within::after {
+  opacity: 1;
+}
+
+/* ---------- 1c. Scrollbars: thin square rails --------------------------- */
+html.terminal-full ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+html.terminal-full ::-webkit-scrollbar-thumb {
+  border-radius: 0;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+html.terminal-full ::-webkit-scrollbar-thumb:hover {
+  background-color: var(--term-green);
+}
+
+html.terminal-full ::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* OverlayScrollbars (library list, some panes) */
+html.terminal-full .os-scrollbar-handle {
+  border-radius: 0 !important;
+  background: var(--term-border) !important;
+}
+
+html.terminal-full .os-scrollbar-handle:hover,
+html.terminal-full .os-scrollbar-handle.active {
+  background: var(--term-green) !important;
+}
+
+/* ---------- 2. Top bar: a shell prompt -----------------------------------
+   Nothing here changes the global nav's height, paddings or
+   -webkit-app-region: those are what keep the window draggable and leave
+   room for the Windows caption buttons (top right) and the macOS traffic
+   lights (top left). Only children are restyled. */
+html.terminal-full .Root__globalNav {
+  background-color: var(--tf-shell-gutter) !important;
+}
+
+/* user@terminal:~/dir$  — before the back/forward buttons, i.e. after
+   whatever space Spotify reserves for the traffic lights on macOS. */
+html.terminal-full .main-globalNav-historyButtons {
+  align-items: center;
+  gap: 4px !important;
+}
+
+html.terminal-full .main-globalNav-historyButtons::before {
+  content: var(--tf-prompt, "user@terminal:~$");
+  order: -1;
+  align-self: center;
+  margin-inline-end: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--term-green);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* The search box is centered in the window, so on narrower windows the
+   prompt shortens, then goes, before the two could overlap. */
+@media (max-width: 1180px) {
+  html.terminal-full .main-globalNav-historyButtons::before {
+    content: var(--tf-prompt-short, "~$");
+  }
+}
+@media (max-width: 920px) {
+  html.terminal-full .main-globalNav-historyButtons::before {
+    content: none;
+  }
+}
+
+/* Shared look for every top-bar icon button: a square, framed key. */
+html.terminal-full .main-globalNav-historyButtons > button,
+html.terminal-full :is([data-testid="top-bar-back-button"], [data-testid="top-bar-forward-button"]),
+html.terminal-full :is(.main-globalNav-searchContainer > button, [data-testid="home-button"], .Root__globalNav .main-globalNav-navLink),
+html.terminal-full .main-globalNav-browseButtonWrapper button,
+html.terminal-full .Root__globalNav :is(.main-topBar-buddyFeed, .main-globalNav-buddyFeed, .main-topBar-whatsNewFeed),
+html.terminal-full .Root__globalNav [data-testid="user-widget-link"] {
+  border-radius: 0 !important;
+  border: 1px solid var(--term-border) !important;
+  background: var(--term-bg) !important;
+  color: var(--term-text) !important;
+  box-shadow: none !important;
+  transform: none !important;
+  min-width: 32px;
+  min-height: 32px;
+  font-family: var(--term-font);
+  transition: border-color var(--tf-fast) var(--tf-ease), color var(--tf-fast) var(--tf-ease), background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .main-globalNav-historyButtons > button:hover:not(:disabled),
+html.terminal-full :is([data-testid="top-bar-back-button"], [data-testid="top-bar-forward-button"]):hover:not(:disabled),
+html.terminal-full :is(.main-globalNav-searchContainer > button, [data-testid="home-button"], .Root__globalNav .main-globalNav-navLink):hover,
+html.terminal-full .main-globalNav-browseButtonWrapper button:hover,
+html.terminal-full .Root__globalNav :is(.main-topBar-buddyFeed, .main-globalNav-buddyFeed, .main-topBar-whatsNewFeed):hover,
+html.terminal-full .Root__globalNav [data-testid="user-widget-link"]:hover {
+  border-color: var(--term-green) !important;
+  color: var(--term-green) !important;
+}
+
+/* Back / forward: ‹ › glyphs. Positions 1 and 2 are the native pair;
+   Spicetify Topbar buttons (ours included) are appended after them and
+   keep their own icons. */
+html.terminal-full .main-globalNav-historyButtons > button:is(:nth-child(1), :nth-child(2)),
+html.terminal-full :is([data-testid="top-bar-back-button"], [data-testid="top-bar-forward-button"]) {
+  width: 32px;
+  height: 32px;
+  padding: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+html.terminal-full .main-globalNav-historyButtons > button:is(:nth-child(1), :nth-child(2)) svg,
+html.terminal-full :is([data-testid="top-bar-back-button"], [data-testid="top-bar-forward-button"]) svg {
+  display: none !important;
+}
+
+html.terminal-full .main-globalNav-historyButtons > button:nth-child(1)::before,
+html.terminal-full [data-testid="top-bar-back-button"]::before {
+  content: "‹";
+}
+html.terminal-full .main-globalNav-historyButtons > button:nth-child(2)::before,
+html.terminal-full [data-testid="top-bar-forward-button"]::before {
+  content: "›";
+}
+html.terminal-full .main-globalNav-historyButtons > button:is(:nth-child(1), :nth-child(2))::before,
+html.terminal-full :is([data-testid="top-bar-back-button"], [data-testid="top-bar-forward-button"])::before {
+  font-size: 20px;
+  line-height: 1;
+  margin-top: -2px;
+}
+
+html.terminal-full .main-globalNav-historyButtons > button:disabled,
+html.terminal-full :is([data-testid="top-bar-back-button"], [data-testid="top-bar-forward-button"]):disabled {
+  opacity: 0.35;
+}
+
+/* Other Spicetify buttons in that row: square and flat like the rest. */
+html.terminal-full .main-globalNav-historyButtons > button {
+  width: 32px;
+  height: 32px;
+}
+
+/* Home: ⌂ ~ */
+html.terminal-full :is(.main-globalNav-searchContainer > button, [data-testid="home-button"], .Root__globalNav .main-globalNav-navLink) {
+  width: auto !important; /* height stays native: it matches the field */
+  padding: 0 12px !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-end: 6px;
+}
+
+html.terminal-full :is(.main-globalNav-searchContainer > button, [data-testid="home-button"], .Root__globalNav .main-globalNav-navLink) svg {
+  display: none !important;
+}
+
+html.terminal-full :is(.main-globalNav-searchContainer > button, [data-testid="home-button"], .Root__globalNav .main-globalNav-navLink)::before {
+  content: "⌂ ~";
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+html.terminal-full :is(.main-globalNav-searchContainer > button, [data-testid="home-button"], .Root__globalNav .main-globalNav-navLink):is(.main-globalNav-navLinkActive, [aria-current="page"]) {
+  color: var(--term-green) !important;
+  border-color: var(--term-green-dim) !important;
+}
+
+/* Search: a command line. ⌕ prompt glyph, "rechercher…" as placeholder,
+   a blinking block caret while focused and empty, the native caret
+   (green, block where supported) once typing. :has(input) makes sure the
+   wrapper really wraps the field before we draw on it. */
+html.terminal-full .main-globalNav-searchInputContainer:has(input) {
+  position: relative;
+}
+
+html.terminal-full .Root__globalNav :is(input[data-testid="search-input"], .main-globalNav-searchInputText, input.main-topBar-searchBar) {
+  border-radius: 0 !important;
+  border: 1px solid var(--term-border) !important;
+  background: var(--term-bg) !important;
+  box-shadow: none !important;
+  outline: none !important; /* focus shows as the green frame below */
+  padding-inline-start: 34px !important;
+  color: var(--term-text) !important;
+  font-size: 13px !important;
+  caret-color: var(--term-green);
+  caret-shape: block;
+  transition: border-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__globalNav :is(input[data-testid="search-input"], .main-globalNav-searchInputText, input.main-topBar-searchBar):hover {
+  border-color: var(--term-subdued) !important;
+}
+
+html.terminal-full .Root__globalNav :is(input[data-testid="search-input"], .main-globalNav-searchInputText, input.main-topBar-searchBar):focus {
+  border-color: var(--term-green) !important;
+}
+
+html.terminal-full .Root__globalNav :is(input[data-testid="search-input"], .main-globalNav-searchInputText, input.main-topBar-searchBar)::placeholder {
+  color: transparent !important;
+}
+
+/* The native magnifier (not inside a button) gives way to the glyph. */
+html.terminal-full .main-globalNav-searchInputContainer:has(input) svg:not(button svg) {
+  display: none !important;
+}
+
+html.terminal-full .main-globalNav-searchInputContainer:has(input)::before,
+html.terminal-full .main-globalNav-searchInputContainer:has(input)::after {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-size: 13px;
+  line-height: 1;
+  z-index: 1;
+}
+
+html.terminal-full .main-globalNav-searchInputContainer:has(input)::before {
+  content: "⌕";
+  left: 12px;
+  font-size: 15px;
+  color: var(--term-green);
+}
+
+html.terminal-full .main-globalNav-searchInputContainer:has(input:placeholder-shown)::after {
+  content: "rechercher…";
+  left: 34px;
+  color: var(--term-subdued);
+}
+
+html.terminal-full .main-globalNav-searchInputContainer:has(input:placeholder-shown:focus)::after {
+  content: "▋";
+  color: var(--term-green);
+  animation: term-blink 1s step-end infinite;
+}
+
+/* Browse (next to the field) and the Ctrl K hint */
+html.terminal-full .main-globalNav-browseButtonWrapper button {
+  width: 32px;
+  height: 32px;
+  padding: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+html.terminal-full .main-globalNav-browseButtonWrapper button svg {
+  display: none !important;
+}
+
+html.terminal-full .main-globalNav-browseButtonWrapper button::before {
+  content: "≡";
+  font-size: 16px;
+  line-height: 1;
+}
+
+html.terminal-full .main-globalNav-browseButtonWrapper {
+  border: 0 !important;
+  background: transparent !important;
+}
+
+html.terminal-full .main-globalNav-searchInputKBDWrapper :is(kbd, span) {
+  border-radius: 0 !important;
+  font-size: 10px !important;
+  color: var(--term-subdued) !important;
+}
+
+/* Right cluster: upsells, install-app and any Spotify logo go; What's New
+   and Friends become labelled keys; the avatar goes square. */
+html.terminal-full .Root__globalNav :is(.main-topBar-UpgradeButton, [data-testid="upgrade-button"], .upgrade-button, a[href*="spotify.com/premium"], a[href*="/premium"], a[href*="/download"], [data-testid="download-app-button"], [data-testid="install-app-button"], a[aria-label="Spotify"], [data-testid="spotify-logo"]),
+html.terminal-full .main-topBar-topbarContentRight > button:has(a[href*="/download"]),
+html.terminal-full .main-userWidget-setupPlan {
+  display: none !important;
+}
+
+html.terminal-full .Root__globalNav :is(.main-topBar-buddyFeed, .main-globalNav-buddyFeed, .main-topBar-whatsNewFeed) {
+  width: auto !important;
+  height: 32px !important;
+  padding: 0 8px !important;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+}
+
+html.terminal-full .Root__globalNav :is(.main-topBar-buddyFeed, .main-globalNav-buddyFeed, .main-topBar-whatsNewFeed) svg {
+  display: none !important;
+}
+
+html.terminal-full .Root__globalNav .main-topBar-whatsNewFeed::before {
+  content: "✱ news";
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+html.terminal-full .Root__globalNav :is(.main-topBar-buddyFeed, .main-globalNav-buddyFeed)::before {
+  content: "☺ amis";
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+html.terminal-full .Root__globalNav :is(.main-topBar-buddyFeedActive, .main-topBar-whatsNewFeedActive) {
+  color: var(--term-bg) !important;
+  background: var(--term-green) !important;
+  border-color: var(--term-green) !important;
+}
+
+html.terminal-full .Root__globalNav :is(.main-topBar-whatsNewFeedNotificationDot, .main-userWidget-notificationDot) {
+  border-radius: 0 !important;
+  background: var(--term-orange) !important;
+  box-shadow: none !important;
+}
+
+html.terminal-full .Root__globalNav [data-testid="user-widget-link"] {
+  padding: 2px !important;
+  width: auto !important;
+  height: 32px !important;
+}
+
+html.terminal-full .Root__globalNav :is(.main-avatar-avatar, .main-avatar-image, [data-testid="user-widget-link"] figure, [data-testid="user-widget-link"] img) {
+  border-radius: 0 !important;
+  width: 26px !important;
+  height: 26px !important;
+}
+
+/* ---------- 2b. OS window chrome -----------------------------------------
+   No OS-specific override is needed: nothing above touches the global
+   nav's height, paddings, spacers or -webkit-app-region, so Spotify keeps
+   reserving the Windows caption-button area (top right, ~140px) and the
+   macOS traffic-light area (top left, ~80px) itself, and the window stays
+   draggable from the same places. Every glyph and label we add lives
+   inside a native button (already no-drag) or is pointer-events:none.
+   Checked in the fixture for both OSes (scratchpad full/A/shell.test.js):
+   padding, app-region and the spacer boxes are identical with the class
+   on and off, and nothing we draw overlaps either reserve. */
+
+/* ---------- 3. Left sidebar: a file tree ---------------------------------- */
+/* Header: ☰ ~/library, ＋ créer */
+html.terminal-full .main-yourLibraryX-header {
+  box-shadow: none !important;
+  border-bottom: 1px solid var(--term-border);
+  padding-block: 6px !important;
+}
+
+html.terminal-full .main-yourLibraryX-collapseButton {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  font-size: 0 !important; /* native label stays for screen readers */
+  color: var(--term-text) !important;
+  background: transparent !important;
+}
+
+html.terminal-full .main-yourLibraryX-collapseButton svg {
+  display: none !important;
+}
+
+html.terminal-full .main-yourLibraryX-collapseButton::before {
+  content: "☰";
+  font-size: 15px;
+  line-height: 1;
+  color: var(--term-green);
+}
+
+html.terminal-full .main-yourLibraryX-collapseButton::after {
+  content: "~/library";
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+html.terminal-full .main-yourLibraryX-collapseButton:hover {
+  color: var(--term-green) !important;
+}
+
+html.terminal-full :is(.main-yourLibraryX-collapseButtonIsCollapsed, .main-yourLibraryX-libraryIsCollapsed .main-yourLibraryX-collapseButton)::after {
+  content: none;
+}
+
+html.terminal-full :is(.main-yourLibraryX-collapseButtonIsCollapsed, .main-yourLibraryX-libraryIsCollapsed .main-yourLibraryX-collapseButton) {
+  justify-content: center;
+  min-width: 32px;
+}
+
+/* Create (+ Créer) and the other header keys */
+html.terminal-full .main-yourLibraryX-header :is(.main-yourLibraryX-createButton, .main-yourLibraryX-button, button[data-encore-id]) {
+  border-radius: 0 !important;
+  border: 1px solid var(--term-border) !important;
+  background: transparent !important;
+  color: var(--term-text) !important;
+  box-shadow: none !important;
+  min-width: 32px;
+  min-height: 32px;
+  transform: none !important;
+}
+
+html.terminal-full .main-yourLibraryX-header :is(.main-yourLibraryX-createButton, .main-yourLibraryX-button, button[data-encore-id]):hover {
+  border-color: var(--term-green) !important;
+  color: var(--term-green) !important;
+}
+
+html.terminal-full .main-yourLibraryX-header .main-yourLibraryX-createButton {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 10px !important;
+  font-size: 12px !important;
+}
+
+html.terminal-full .main-yourLibraryX-header .main-yourLibraryX-createButton svg {
+  display: none !important;
+}
+
+html.terminal-full .main-yourLibraryX-header .main-yourLibraryX-createButton::before {
+  content: "＋";
+  font-size: 13px;
+  line-height: 1;
+  color: var(--term-green);
+}
+
+/* Filter chips -> [playlists] [artistes] tabs; the selected one in
+   inverse video. The brackets go on the inner label only, so a build that
+   drops the inner span loses the brackets, never doubles them. */
+html.terminal-full .main-yourLibraryX-filterArea :is(button, [role="checkbox"], [role="option"], [data-encore-id="chip"]) {
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  min-height: 32px;
+  padding: 0 !important;
+}
+
+html.terminal-full .main-yourLibraryX-filterArea [class*="ChipInnerComponent"] {
+  border-radius: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: var(--term-subdued) !important;
+  padding: 2px 6px !important;
+  font-size: 12px !important;
+  text-transform: lowercase;
+  transition: color var(--tf-fast) var(--tf-ease), background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .main-yourLibraryX-filterArea [class*="ChipInnerComponent"]::before {
+  content: "[";
+}
+
+html.terminal-full .main-yourLibraryX-filterArea [class*="ChipInnerComponent"]::after {
+  content: "]";
+}
+
+html.terminal-full .main-yourLibraryX-filterArea :is(button, [data-encore-id="chip"]):hover [class*="ChipInnerComponent"] {
+  color: var(--term-text) !important;
+}
+
+html.terminal-full .main-yourLibraryX-filterArea [class*="ChipInnerComponent-selected"],
+html.terminal-full .main-yourLibraryX-filterArea :is([aria-checked="true"], [aria-pressed="true"], [aria-selected="true"]) [class*="ChipInnerComponent"] {
+  background: var(--term-green) !important;
+  color: var(--term-bg) !important;
+}
+
+/* Sort + filter row */
+html.terminal-full .Root__nav-bar :is(.x-filterBox-expandButton, .x-sortBox-sortDropdown, .main-yourLibraryX-librarySortWrapper button) {
+  border-radius: 0 !important;
+  min-height: 32px;
+  min-width: 32px;
+  color: var(--term-subdued) !important;
+  background: transparent !important;
+  transform: none !important;
+}
+
+html.terminal-full .Root__nav-bar :is(.x-filterBox-expandButton, .x-sortBox-sortDropdown, .main-yourLibraryX-librarySortWrapper button):hover {
+  color: var(--term-green) !important;
+}
+
+html.terminal-full .Root__nav-bar .x-filterBox-expandButton svg {
+  display: none !important;
+}
+
+html.terminal-full .Root__nav-bar .x-filterBox-expandButton::before {
+  content: "⌕";
+  font-size: 16px;
+  line-height: 1;
+}
+
+html.terminal-full .Root__nav-bar :is(.x-sortBox-sortDropdown, .main-yourLibraryX-librarySortWrapper button) {
+  font-size: 12px !important;
+  gap: 6px;
+}
+
+html.terminal-full .Root__nav-bar .x-filterBox-filterInput {
+  border-radius: 0 !important;
+  border: 1px solid var(--term-border) !important;
+  background: var(--term-bg) !important;
+  color: var(--term-text) !important;
+  caret-color: var(--term-green);
+  font-size: 12px !important;
+  height: 32px;
+}
+
+html.terminal-full .Root__nav-bar .x-filterBox-filterInput:focus {
+  border-color: var(--term-green) !important;
+  outline: none !important;
+}
+
+html.terminal-full .Root__nav-bar .x-filterBox-searchIcon {
+  color: var(--term-green) !important;
+  fill: var(--term-green) !important;
+}
+
+/* Rows -> tree. The ├─ / └─ connectors are drawn with 1px lines rather
+   than box-drawing glyphs: rows are 48-64px tall, and glyphs would leave
+   gaps in the vertical rule between rows. List mode only: grid mode
+   (cards) and the collapsed rail keep plain tiles. */
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem {
+  position: relative;
+}
+
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist .main-yourLibraryX-listItem:not(:has([data-encore-id="card"])) {
+  padding-inline-start: 22px !important;
+}
+
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist .main-yourLibraryX-listItem:not(:has([data-encore-id="card"]))::before,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist .main-yourLibraryX-listItem:not(:has([data-encore-id="card"]))::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  background: var(--term-subdued);
+  opacity: 0.45;
+  pointer-events: none;
+  z-index: 1;
+  transition: opacity var(--tf-fast) var(--tf-ease);
+}
+
+/* ├ vertical */
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist .main-yourLibraryX-listItem:not(:has([data-encore-id="card"]))::before {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+
+/* ─ horizontal */
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist .main-yourLibraryX-listItem:not(:has([data-encore-id="card"]))::after {
+  top: 50%;
+  width: 14px;
+  height: 1px;
+}
+
+/* └ on the last row */
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist :is(.main-yourLibraryX-listItem:last-child, [role="row"]:last-child > .main-yourLibraryX-listItem, [role="row"]:last-child .main-yourLibraryX-listItem):not(:has([data-encore-id="card"]))::before {
+  bottom: 50%;
+}
+
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist .main-yourLibraryX-listItem:not(:has([data-encore-id="card"])):hover::after,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist .main-yourLibraryX-listItem:not(:has([data-encore-id="card"])):focus-within::after {
+  background: var(--term-green);
+  opacity: 1;
+}
+
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem :is([data-encore-id="listRow"], .main-yourLibraryX-listItemGroup) {
+  border-radius: 0 !important;
+  padding-block: 4px !important;
+  transition: background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem :is([data-encore-id="listRow"], .main-yourLibraryX-listItemGroup):hover {
+  background-color: var(--term-bg-hi) !important;
+}
+
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem :is([aria-selected="true"], [aria-current="page"], [data-context-menu-open="true"]) {
+  background-color: var(--term-bg-hi) !important;
+  box-shadow: inset 2px 0 0 var(--term-green) !important;
+}
+
+html.terminal-full .Root__nav-bar :is(.main-yourLibraryX-listRowTitleLink, [data-encore-id="listRowTitle"]) {
+  font-size: 13px !important;
+  font-weight: 400 !important;
+}
+
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem:hover :is(.main-yourLibraryX-listRowTitleLink, [data-encore-id="listRowTitle"]) {
+  color: var(--term-green) !important;
+}
+
+html.terminal-full .Root__nav-bar :is(.main-yourLibraryX-listRowSubtitle, [data-encore-id="listRowSubtitle"]) {
+  font-size: 11px !important;
+  color: var(--term-subdued) !important;
+}
+
+/* Pinned / downloaded / playing markers: accent, square, small. */
+html.terminal-full .Root__nav-bar :is(.main-yourLibraryX-listRowSubtitle, [data-encore-id="listRowSubtitle"], .main-rootlist-statusIcons) svg {
+  fill: var(--term-green) !important;
+  color: var(--term-green) !important;
+}
+
+/* Covers: square, framed, a size down (list mode). */
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist .main-yourLibraryX-listItem:not(:has([data-encore-id="card"])) :is(.main-yourLibraryX-rowCover, .main-yourLibraryX-listRowEntityImage) {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+}
+
+html.terminal-full .Root__nav-bar :is(.main-yourLibraryX-rowCover, .main-yourLibraryX-listRowEntityImage, .x-entityImage-imageContainer) {
+  outline: 1px solid var(--term-border);
+  outline-offset: -1px;
+}
+
+/* Collapsed rail: no tree, centered framed tiles. */
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryIsCollapsed .main-yourLibraryX-listItem {
+  padding-inline-start: 0 !important;
+}
+
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryIsCollapsed .main-yourLibraryX-listItem::before,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryIsCollapsed .main-yourLibraryX-listItem::after {
+  content: none !important;
+}
+
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryIsCollapsed :is(.main-yourLibraryX-rowCover, .main-yourLibraryX-listRowEntityImage) {
+  width: 40px !important;
+  height: 40px !important;
+}
+
+/* Grid mode: framed square cards. */
+html.terminal-full .Root__nav-bar [data-encore-id="card"] {
+  border: 1px solid var(--term-border) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transition: border-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__nav-bar [data-encore-id="card"]:hover {
+  border-color: var(--term-green) !important;
+}
+
+/* ---------- 4. Reduced motion: none of the above moves ---------------- */
+@media (prefers-reduced-motion: reduce) {
+  html.terminal-full .Root__globalNav,
+  html.terminal-full .Root__nav-bar,
+  html.terminal-full .Root__main-view,
+  html.terminal-full .Root__right-sidebar,
+  html.terminal-full .Root__nav-bar::before,
+  html.terminal-full .Root__main-view::before,
+  html.terminal-full .Root__right-sidebar::before,
+  html.terminal-full .main-globalNav-searchInputContainer::after {
+    animation: none !important;
+  }
+}
 /* --- END FULL/SHELL ------------------------------------------------------ */
 
 /* --- FULL/PLAYER (agent B) ----------------------------------------------- */
