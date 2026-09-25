@@ -2024,13 +2024,13 @@ html.terminal-full .main-nowPlayingBar-left::before {
   transition: background-color var(--tf-med) var(--tf-ease), color var(--tf-med) var(--tf-ease);
 }
 
-html.terminal-full[data-tf-playback="playing"] .main-nowPlayingBar-left::before {
+html.terminal-full [data-tf-playback="playing"] .main-nowPlayingBar-left::before {
   content: "▶\FE0E  play";
   color: var(--term-bg);
   background: var(--term-green);
 }
 
-html.terminal-full[data-tf-playback="paused"] .main-nowPlayingBar-left::before {
+html.terminal-full [data-tf-playback="paused"] .main-nowPlayingBar-left::before {
   content: "❚❚ pause";
   color: var(--term-text);
 }
@@ -2211,7 +2211,7 @@ html.terminal-full [data-testid="control-button-sleep-timer"] { --tfp-glyph: "zZ
 html.terminal-full [data-testid="control-button-npv-episodes"] { --tfp-glyph: "≡"; }
 
 html.terminal-full [data-testid="control-button-repeat"]:is([aria-checked="mixed"]),
-html.terminal-full[data-tf-repeat="2"] [data-testid="control-button-repeat"] {
+html.terminal-full [data-tf-repeat="2"] [data-testid="control-button-repeat"] {
   --tfp-glyph: "↻¹";
 }
 
@@ -2310,7 +2310,7 @@ html.terminal-full :is(
 /* Active shuffle / repeat: inverse video (green block, dark glyph), the
    way a terminal shows a selected item. */
 html.terminal-full :is([data-testid="control-button-shuffle"], [data-testid="control-button-repeat"]):is([aria-checked="true"], [aria-checked="mixed"], .control-button--active, .main-shuffleButton-active, .main-repeatButton-active),
-html.terminal-full[data-tf-shuffle="1"] [data-testid="control-button-shuffle"],
+html.terminal-full [data-tf-shuffle="1"] [data-testid="control-button-shuffle"],
 html.terminal-full:is([data-tf-repeat="1"], [data-tf-repeat="2"]) [data-testid="control-button-repeat"] {
   color: var(--term-bg) !important;
   background-color: var(--term-green) !important;
@@ -2318,7 +2318,7 @@ html.terminal-full:is([data-tf-repeat="1"], [data-tf-repeat="2"]) [data-testid="
 }
 
 html.terminal-full :is([data-testid="control-button-shuffle"], [data-testid="control-button-repeat"]):is([aria-checked="true"], [aria-checked="mixed"], .control-button--active, .main-shuffleButton-active, .main-repeatButton-active)::after,
-html.terminal-full[data-tf-shuffle="1"] [data-testid="control-button-shuffle"]::after,
+html.terminal-full [data-tf-shuffle="1"] [data-testid="control-button-shuffle"]::after,
 html.terminal-full:is([data-tf-repeat="1"], [data-tf-repeat="2"]) [data-testid="control-button-repeat"]::after {
   background: var(--term-bg) !important;
 }
@@ -2377,15 +2377,15 @@ html.terminal-full [data-testid="control-button-playpause"] svg {
   color: inherit !important;
 }
 
-html.terminal-full[data-tf-playback] [data-testid="control-button-playpause"] > span > * {
+html.terminal-full [data-tf-playback] [data-testid="control-button-playpause"] > span > * {
   display: none !important;
 }
 
-html.terminal-full[data-tf-playback] [data-testid="control-button-playpause"] > span::before {
+html.terminal-full [data-tf-playback] [data-testid="control-button-playpause"] > span::before {
   content: "▶\FE0E";
 }
 
-html.terminal-full[data-tf-playback="playing"] [data-testid="control-button-playpause"] > span::before {
+html.terminal-full [data-tf-playback="playing"] [data-testid="control-button-playpause"] > span::before {
   content: "❚❚";
   letter-spacing: -0.1em;
 }
@@ -2633,7 +2633,7 @@ html.terminal-full [data-testid="volume-bar-toggle-mute-button"]::before {
   content: "vol";
 }
 
-html.terminal-full[data-tf-muted="1"] [data-testid="volume-bar-toggle-mute-button"]::before {
+html.terminal-full [data-tf-muted="1"] [data-testid="volume-bar-toggle-mute-button"]::before {
   content: "mute";
   text-decoration: line-through;
 }
@@ -3238,7 +3238,7 @@ html.terminal-full .main-home-filterChipsSection::after {
   display: none !important;
 }
 
-html.terminal-full .Root__main-view :is(button, a, [role="checkbox"], [role="tab"]):has(> [class*="ChipInnerComponent"]) {
+html.terminal-full .Root__main-view [data-encore-id="chip"] {
   background: transparent !important;
   box-shadow: none !important;
 }
@@ -3349,7 +3349,9 @@ html.terminal-full .Root__main-view :is(.view-homeShortcutsGrid-equaliser, .view
   display: none !important;
 }
 
-html.terminal-full .Root__main-view :is(.main-trackList-trackListRow, .view-homeShortcutsGrid-shortcut) :has(> :is(.view-homeShortcutsGrid-equaliser, .view-homeShortcutsGrid-equaliserImage, .main-trackList-playingIcon, img[src*="equaliser"]))::before {
+/* Subject is the index cell (class-bucketed) rather than "any element in a
+   row", which made Chromium run a :has() check on every node of every row. */
+html.terminal-full .Root__main-view .main-trackList-rowSectionIndex:has(> :is(.main-trackList-playingIcon, img[src*="equaliser"]))::before {
   content: "▶\FE0E";
   color: var(--term-green);
   font-size: 12px;
@@ -4027,12 +4029,12 @@ html.terminal-full .Root__main-view :is(.main-trackList-selected, [aria-selected
   background-color: color-mix(in srgb, var(--term-green) 16%, var(--term-bg)) !important;
 }
 
-html.terminal-full .Root__main-view .main-trackList-trackListRow:is(.main-trackList-active, :has(.main-trackList-playingIcon), :has(img[src*="equaliser"]), :has([data-playing-indicator])) {
+html.terminal-full .Root__main-view .main-trackList-trackListRow:is(.main-trackList-active, :has(.main-trackList-playingIcon)) {
   background-color: color-mix(in srgb, var(--term-green) 9%, var(--term-bg)) !important;
   box-shadow: inset 2px 0 0 var(--term-green) !important;
 }
 
-html.terminal-full .Root__main-view .main-trackList-trackListRow:is(.main-trackList-active, :has(.main-trackList-playingIcon), :has(img[src*="equaliser"]), :has([data-playing-indicator])) :is(.main-trackList-rowMainContentTitle, .main-trackList-rowTitle, .main-trackList-number) {
+html.terminal-full .Root__main-view .main-trackList-trackListRow:is(.main-trackList-active, :has(.main-trackList-playingIcon)) :is(.main-trackList-rowMainContentTitle, .main-trackList-rowTitle, .main-trackList-number) {
   color: var(--term-green) !important;
 }
 
@@ -4990,5 +4992,65 @@ html.terminal-full .terminal-view-enter {
 @keyframes tf-view-in {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
+}
+
+/* Fixes from the second real-client screenshot (Liked Songs, Windows). */
+
+/* Header / action-bar colour wash: the real client paints it through an
+   inline background-color on wrappers whose classes don't all contain
+   "entityHeader", so the purple survived. Any inline background colour in
+   the main view is flattened, except genre tiles (they keep their colour
+   as the left bar) and images. */
+html.terminal-full .Root__main-view :is(
+  .main-entityHeader-background,
+  .main-entityHeader-backgroundColor,
+  .main-entityHeader-overlay,
+  .main-actionBarBackground-background,
+  [style*="background-color"]:not(img):not([class*="CategoryCard"]):not([class*="categoryCard"])
+) {
+  background-color: var(--term-bg) !important;
+  background-image: none !important;
+}
+html.terminal-full .Root__main-view [style*="--background-color"],
+html.terminal-full .Root__main-view [style*="--bgColor"] {
+  --background-color: var(--term-bg) !important;
+  --bgColor: var(--term-bg) !important;
+}
+
+/* Thin rule crossing the header (and the cover) under the sticky top bar. */
+html.terminal-full .main-topBar-container {
+  border-bottom: 0 !important;
+}
+
+/* "Plavlist": the pretitle's line box clipped descenders. */
+html.terminal-full .Root__main-view .main-entityHeader-pretitle,
+html.terminal-full .Root__main-view .main-entityHeader-pretitle * {
+  line-height: 1.4 !important;
+  overflow: visible !important;
+}
+
+/* "☻🔔" / "☻👥": our glyph was added next to Spotify's own icon. */
+html.terminal-full .Root__globalNav .main-topBar-whatsNewFeed::before,
+html.terminal-full .Root__globalNav :is(.main-topBar-buddyFeed, .main-globalNav-buddyFeed)::before {
+  content: none !important;
+}
+
+/* "2:3]8": the seek bar's closing bracket landed on the duration. */
+html.terminal-full .playback-bar [data-testid="progress-bar"]::before,
+html.terminal-full .playback-bar [data-testid="progress-bar"]::after {
+  content: none !important;
+}
+
+/* Inverted sets (Marketplace install button, carousel arrows) were bright
+   white blocks; they become terminal keys: elevated surface, green text. */
+html.terminal-full .encore-inverted-light-set,
+html.terminal-full .encore-dark-theme .encore-inverted-light-set {
+  --background-base: var(--term-bg-elevated-hi) !important;
+  --background-highlight: var(--term-green-dim) !important;
+  --background-press: var(--term-bg-press) !important;
+  --text-base: var(--term-green) !important;
+  --text-subdued: var(--term-subdued) !important;
+  --essential-base: var(--term-green) !important;
+  --essential-subdued: var(--term-subdued) !important;
 }
 /* --- END FULL/CHROME ----------------------------------------------------- */

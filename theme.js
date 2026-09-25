@@ -1189,7 +1189,13 @@
 	// exists even when the init waitFor fires synchronously.
 
 	function setupFullConversion() {
-		applyFullConversionSetting();
+		// Deferred one tick: on the real client Spicetify.Player exists as
+		// soon as this file runs, so the init waitFor fires synchronously —
+		// before the FULL/* sections further down have registered their
+		// parts. Applying right away ran an empty list (CSS on, every JS
+		// part — pane titles, header metadata, playback sync, branding —
+		// silently missing). By the next tick the whole file has executed.
+		setTimeout(applyFullConversionSetting, 0);
 	}
 
 	function applyFullConversionSetting() {
@@ -1333,10 +1339,21 @@
 	function shellApplyTitles(pathname, pageName) {
 		if (!shellState.on) return;
 		var route = shellRoute(pathname, pageName);
-		var root = document.documentElement.style;
-		root.setProperty("--tf-main-title", shellCssString("[1:" + route.path + "]"));
-		root.setProperty("--tf-prompt", shellCssString(shellUserName() + "@terminal:" + route.dir + "$"));
-		root.setProperty("--tf-prompt-short", shellCssString(route.dir + "$"));
+		// Kept in JS, not as custom properties on <html>: every write to a
+		// root custom property restyles the entire app (all inherit it), and
+		// this ran up to five times per navigation — measured as multi-second
+		// freezes on a large page. The pane-title layer reads mainTitle from
+		// here; the prompt vars go on the prompt's own small element.
+		shellState.mainTitle = "[1:" + route.path + "]";
+		var host = document.querySelector(".main-globalNav-historyButtons");
+		if (host) {
+			var full = shellCssString(shellUserName() + "@terminal:" + route.dir + "$");
+			var short = shellCssString(route.dir + "$");
+			if (host.style.getPropertyValue("--tf-prompt") !== full) host.style.setProperty("--tf-prompt", full);
+			if (host.style.getPropertyValue("--tf-prompt-short") !== short) host.style.setProperty("--tf-prompt-short", short);
+			shellState.promptHost = host;
+		}
+		schedulePaneTitles();
 	}
 
 	function shellClearTimers() {
@@ -1409,12 +1426,14 @@
 		}
 		shellState.unlisten = null;
 		shellState.lastName = "";
-		var root = document.documentElement.style;
-		root.removeProperty("--tf-main-title");
-		root.removeProperty("--tf-prompt");
-		root.removeProperty("--tf-prompt-short");
-		// Leave <html> exactly as we found it: no empty style="" behind.
-		if (document.documentElement.getAttribute("style") === "") document.documentElement.removeAttribute("style");
+		shellState.mainTitle = "";
+		var host = shellState.promptHost;
+		if (host) {
+			host.style.removeProperty("--tf-prompt");
+			host.style.removeProperty("--tf-prompt-short");
+			if (host.getAttribute("style") === "") host.removeAttribute("style");
+			shellState.promptHost = null;
+		}
 	}
 
 	fullConversionParts.push({ setup: setupFullShell, teardown: teardownFullShell });
@@ -1451,7 +1470,7 @@
 			// a 500ms poll made the whole client stutter.
 			var text;
 			if (k === "nav") text = r.width < 120 ? "[0]" : "[0:~/library]";
-			else if (k === "main") text = html.style.getPropertyValue("--tf-main-title").trim().replace(/^["']|["']$/g, "") || "[1:~/home]";
+			else if (k === "main") text = shellState.mainTitle || "[1:~/home]";
 			else if (el.querySelector("#queue-panel, [data-testid=\"queue-page\"]")) text = "[2:queue]";
 			else if (el.querySelector("[data-testid=\"buddy-feed\"]")) text = "[2:friends]";
 			else text = "[2:now-playing]";
@@ -1558,7 +1577,12 @@
 	var FULL_PLAYER_ATTRS = ["data-tf-playback", "data-tf-shuffle", "data-tf-repeat", "data-tf-muted"];
 
 	function fullPlayerRoots() {
-		var roots = [document.documentElement];
+		// The state goes on the playbar itself, not <html>: every consumer
+		// lives inside the bar, and an attribute change on <html> restyles
+		// the whole app on each play/pause/shuffle. The mini player is a
+		// separate small document, so its root is fine.
+		var bar = document.querySelector(".Root__now-playing-bar");
+		var roots = [bar || document.documentElement];
 		try {
 			var pip = window.documentPictureInPicture && window.documentPictureInPicture.window;
 			if (pip && pip.document && pip.document.documentElement) roots.push(pip.document.documentElement);
@@ -1654,7 +1678,7 @@
 		fullPlayer.onPipEnter = null;
 		clearInterval(fullPlayer.timer);
 		fullPlayer.timer = null;
-		var roots = fullPlayerRoots();
+		var roots = fullPlayerRoots().concat([document.documentElement]);
 		FULL_PLAYER_ATTRS.forEach(function (name) { fullPlayerSetAttr(roots, name, null); });
 	}
 
