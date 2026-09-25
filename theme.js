@@ -34,7 +34,7 @@
 	// have Cascadia installed; Cascadia/Consolas only get reached on
 	// Windows (Menlo on macOS), where none of the Linux faces exist.
 	// Shown by the boot log and `neofetch`; keep in sync with CHANGELOG.md.
-	var THEME_VERSION = "1.1.2";
+	var THEME_VERSION = "1.2.0";
 
 	var TERM_FONT_STACK =
 		"'JetBrains Mono', 'Fira Code', 'Hack', 'DejaVu Sans Mono', " +
@@ -86,7 +86,7 @@
 	// ---------------------------------------------------------------------
 	var FEATURE_REGISTRY = [
 		{ key: "boot", label: "séquence de démarrage au lancement", default: true },
-		{ key: "pulse", label: "pulsation lecture en cours (couleur + tempo)", default: true, setup: function () { setupNowPlayingPulse(); } },
+		{ key: "pulse", label: "pulsation lecture en cours (couleur + tempo)", default: true, setup: function () { setupNowPlayingPulse(); }, onToggle: function () { applyPulseVisuals(); } },
 		{ key: "transitions", label: "transitions de page", default: true, setup: function () { setupPageTransitions(); } },
 		{ key: "typewriter", label: "titres façon machine à écrire", default: true, setup: function () { setupTypewriter(); } },
 		{ key: "palette", label: "palette de commandes (ctrl+maj+k)", default: true, setup: function () { setupCommandPalette(); } },
@@ -271,8 +271,8 @@
 		var overlay = document.createElement("div");
 		overlay.id = "terminal-boot-overlay";
 
-		// Window-drag handle for Windows' in-app title bar; display:none on
-		// every other OS (see .terminal-drag-strip in user.css).
+		// Window-drag handle for the in-app title bar on Windows and macOS;
+		// display:none on Linux (see .terminal-drag-strip in user.css).
 		var dragStrip = document.createElement("div");
 		dragStrip.className = "terminal-drag-strip";
 		overlay.appendChild(dragStrip);
@@ -473,6 +473,16 @@
 	// =======================================================================
 	var lastExtractedColor = null; // last raw hex from colorExtractor, pre-mood-tint
 	var lastAudioFeatures = null;
+	// URI of the track apply() last ran for. colorExtractor / audio-features
+	// resolve asynchronously, so when skipping quickly the previous track's
+	// response can land after the new track's — each .then() checks this
+	// before touching the DOM or the last* globals (it still fills the cache
+	// under its own URI, so replaying that track stays instant).
+	var currentTrackUri = null;
+
+	function isCurrentTrack(uri) {
+		return uri === currentTrackUri;
+	}
 
 	// Cover color + audio-features by track URI, so replaying a track this
 	// session re-applies instantly from memory instead of re-fetching both
@@ -480,27 +490,42 @@
 	// matches playHistory's lifetime).
 	var trackDataCache = {};
 
+	// Drop everything the previous track left behind — the inline
+	// --track-accent (raw or mood-tinted, see applyMoodTint) and
+	// --track-bpm-ms on <html>, plus its tempo markers — so a track with no
+	// color/audio-features (local file, podcast, nothing playing) falls back
+	// to the CSS defaults in user.css instead of keeping stale values.
+	// Called synchronously right before the new values are set (cached path),
+	// so there is no paint in between and no visible flash.
+	function resetTrackVisuals() {
+		document.documentElement.style.removeProperty("--track-accent");
+		document.documentElement.style.removeProperty("--track-bpm-ms");
+		clearTempoMarkers();
+	}
+
 	function setupNowPlayingPulse() {
+		// Track data (cover color + audio-features) is fetched and cached on
+		// every track change regardless of settings.pulse: lastAudioFeatures
+		// also feeds the tempo markers, the visualizer's fallback and the
+		// palette's `stats`, which each check their own setting. Only the
+		// pulse's CSS custom properties are gated on settings.pulse, in
+		// applyPulseVisuals() — which the settings toggle also calls, so
+		// flipping the pulse at runtime takes effect on the current track.
 		function apply(uri) {
-			if (!settings.pulse || !uri) return;
-			var trackId = uri.split(":")[2];
+			// Set before anything else (and regardless of settings.pulse) so
+			// in-flight responses for the previous track see they're stale.
+			currentTrackUri = uri || null;
 			lastExtractedColor = null;
 			lastAudioFeatures = null;
+			resetTrackVisuals();
+			if (!uri) return; // nothing playing: CSS defaults, no markers
 
+			var trackId = uri.split(":")[2];
 			var cached = trackDataCache[uri];
 			if (cached) {
-				if (cached.color) {
-					lastExtractedColor = cached.color;
-					document.documentElement.style.setProperty("--track-accent", cached.color);
-				}
-				if (cached.features) {
-					lastAudioFeatures = cached.features;
-					var cachedTempo = cached.features.tempo;
-					if (cachedTempo && cachedTempo > 20 && cachedTempo < 300) {
-						document.documentElement.style.setProperty("--track-bpm-ms", Math.round((60000 / cachedTempo) * 2) + "ms");
-					}
-				}
-				if (lastExtractedColor && lastAudioFeatures) applyMoodTint(lastAudioFeatures);
+				if (cached.color) lastExtractedColor = cached.color;
+				if (cached.features) lastAudioFeatures = cached.features;
+				applyPulseVisuals();
 				renderTempoMarkers();
 				return; // already fetched this track this session — no network needed
 			}
@@ -510,12 +535,11 @@
 				Spicetify.colorExtractor(uri)
 					.then(function (colors) {
 						var accent = (colors && (colors.VIBRANT || colors.PROMINENT || colors.LIGHT_VIBRANT)) || null;
-						if (accent) {
-							lastExtractedColor = accent;
-							trackDataCache[uri].color = accent;
-							document.documentElement.style.setProperty("--track-accent", accent);
-							if (lastAudioFeatures) applyMoodTint(lastAudioFeatures);
-						}
+						if (!accent) return;
+						trackDataCache[uri].color = accent;
+						if (!isCurrentTrack(uri)) return; // skipped meanwhile: cache only
+						lastExtractedColor = accent;
+						applyPulseVisuals();
 					})
 					.catch(function () {
 						/* extraction can fail for local files/podcasts — keep the
@@ -530,16 +554,10 @@
 						"?format=json"
 				)
 					.then(function (data) {
-						var tempo = data && data.tempo;
-						if (tempo && tempo > 20 && tempo < 300) {
-							// 2 beats per breathing cycle — max-intensity pass: faster,
-							// more visibly "alive" than the original 4-beat cycle.
-							var ms = Math.round((60000 / tempo) * 2);
-							document.documentElement.style.setProperty("--track-bpm-ms", ms + "ms");
-						}
-						lastAudioFeatures = data;
 						trackDataCache[uri].features = data;
-						if (lastExtractedColor) applyMoodTint(data);
+						if (!isCurrentTrack(uri)) return; // skipped meanwhile: cache only
+						lastAudioFeatures = data;
+						applyPulseVisuals();
 						renderTempoMarkers();
 					})
 					.catch(function () {
@@ -551,12 +569,35 @@
 
 		Spicetify.Player.addEventListener("songchange", function (event) {
 			var item = (event && event.data && event.data.item) || (Spicetify.Player.data && Spicetify.Player.data.item);
-			if (item) apply(item.uri);
+			apply(item && item.uri);
 		});
 
 		if (Spicetify.Player.data && Spicetify.Player.data.item) {
 			apply(Spicetify.Player.data.item.uri);
 		}
+	}
+
+	// Writes the pulse's CSS custom properties from the current track data
+	// (lastExtractedColor / lastAudioFeatures), or removes them when the
+	// pulse is disabled so user.css falls back to terminal green / 2.4s.
+	// Safe to call at any time: with data still missing it just sets what
+	// it has, and it is idempotent (mood tint is recomputed from the raw
+	// extracted color, never from the already-tinted value).
+	function applyPulseVisuals() {
+		var style = document.documentElement.style;
+		if (!settings.pulse) {
+			style.removeProperty("--track-accent");
+			style.removeProperty("--track-bpm-ms");
+			return;
+		}
+		if (lastExtractedColor) style.setProperty("--track-accent", lastExtractedColor);
+		var tempo = lastAudioFeatures && lastAudioFeatures.tempo;
+		if (tempo && tempo > 20 && tempo < 300) {
+			// 2 beats per breathing cycle — max-intensity pass: faster,
+			// more visibly "alive" than the original 4-beat cycle.
+			style.setProperty("--track-bpm-ms", Math.round((60000 / tempo) * 2) + "ms");
+		}
+		if (lastExtractedColor && lastAudioFeatures) applyMoodTint(lastAudioFeatures);
 	}
 
 	function applyMoodTint(features) {
@@ -744,9 +785,26 @@
 			var h = Math.max(16, container.clientHeight || 96);
 			var rows = Math.max(4, Math.round(cols * (h / w)));
 
+			// Spicetify virtualizes track lists / card grids and *recycles*
+			// row DOM on scroll: the same container (and often the same <img>)
+			// gets a new src while an earlier probe is still in flight. Loads
+			// can resolve out of order (old, slow src landing after the new,
+			// fast one), which used to paint the previous row's cover onto the
+			// recycled row. container._terminalAsciiSrc doubles as the "which
+			// src is this container supposed to show" token: a probe only draws
+			// if it's still the requested src AND the live <img> still points
+			// at it. Pure DOM/JS, no platform-specific behavior.
+			function isStale() {
+				if (container._terminalAsciiSrc !== srcUrl) return true;
+				var liveImg = container.querySelector("img");
+				if (!liveImg) return true;
+				return (liveImg.currentSrc || liveImg.src) !== srcUrl && liveImg.src !== srcUrl;
+			}
+
 			var probe = new Image();
 			probe.crossOrigin = "anonymous";
 			probe.onload = function () {
+				if (isStale()) return;
 				try {
 					// Stage 1: let the canvas do a high-quality resize down to a
 					// fixed, moderate intermediate buffer — cheap and avoids
@@ -837,6 +895,9 @@
 				}
 			};
 			probe.onerror = function () {
+				// Only clear the token if it's still ours — a stale probe's
+				// failure mustn't force a redundant re-render of the new src.
+				if (container._terminalAsciiSrc !== srcUrl) return;
 				container._terminalAsciiSrc = null; // allow retry on next pass
 			};
 			probe.src = srcUrl;
@@ -933,13 +994,16 @@
 		// finishes an async fetch and mounts well after both the route
 		// change and the retry window above. Observe the main view for any
 		// subtree growth and re-scan, debounced so a big list mount (e.g.
-		// scrolling Liked Songs) only triggers one pass.
+		// scrolling Liked Songs) only triggers one pass. Also watches img
+		// src/srcset attribute changes: recycled virtualized rows keep the
+		// same <img> node and just swap its src, which a childList-only
+		// observer never sees — the row would keep the previous cover's art.
 		var mainView = document.querySelector(".Root__main-view") || document.querySelector("#main") || document.body;
 		var mutTimer = null;
 		new MutationObserver(function () {
 			clearTimeout(mutTimer);
 			mutTimer = setTimeout(renderAll, 250);
-		}).observe(mainView, { childList: true, subtree: true });
+		}).observe(mainView, { childList: true, subtree: true, attributes: true, attributeFilter: ["src", "srcset"] });
 
 		renderWithRetries();
 	}
@@ -1570,14 +1634,72 @@
 	}
 
 	function setupVimNav() {
-		Spicetify.Player.addEventListener("appchange", function () {
+		// The highlighted row element itself, not just its index. The index
+		// alone went stale on navigation: after j,j on one playlist, Enter on
+		// the next one played rows[1] there — a row that was never
+		// highlighted. Holding the element lets Enter check that the row is
+		// still in the DOM and still carries the cursor class before acting.
+		var vimRow = null;
+
+		function clearVimCursor() {
 			vimIndex = -1;
-		});
+			vimRow = null;
+			var marked = document.querySelectorAll(".terminal-vim-cursor");
+			for (var i = 0; i < marked.length; i++) marked[i].classList.remove("terminal-vim-cursor");
+		}
+
+		// Returns the highlighted row only if it's still live: connected to
+		// the document (React unmounts rows on route change and when the
+		// virtualized list scrolls them out) and still marked. Anything else
+		// means "no selection", and the stale state is dropped.
+		function currentVimRow() {
+			if (vimRow && vimRow.isConnected && vimRow.classList.contains("terminal-vim-cursor")) return vimRow;
+			if (vimRow || vimIndex !== -1) clearVimCursor();
+			return null;
+		}
+
+		// Enter on a focused button/link/control must keep its native
+		// meaning (activate that control), so the Enter handler stands down
+		// whenever focus is on anything interactive. isTypingContext only
+		// covers text fields; this is broader.
+		var INTERACTIVE_SELECTOR =
+			"button, a[href], input, textarea, select, summary, [contenteditable]:not([contenteditable=\"false\"]), " +
+			"[role=\"button\"], [role=\"link\"], [role=\"textbox\"], [role=\"searchbox\"], [role=\"combobox\"], " +
+			"[role=\"menuitem\"], [role=\"menuitemcheckbox\"], [role=\"menuitemradio\"], [role=\"option\"], " +
+			"[role=\"checkbox\"], [role=\"radio\"], [role=\"switch\"], [role=\"slider\"], [role=\"tab\"], [role=\"spinbutton\"]";
+
+		function isInteractiveFocus() {
+			var el = document.activeElement;
+			if (!el || el === document.body || el === document.documentElement) return false;
+			if (el.isContentEditable) return true;
+			return !!(el.closest && el.closest(INTERACTIVE_SELECTOR));
+		}
+
+		Spicetify.Player.addEventListener("appchange", clearVimCursor);
+
+		// appchange doesn't fire for ordinary in-app navigation (playlist ->
+		// playlist), so also reset on every History route change. Same
+		// waitFor pattern as setupAsciiCoverArt: Platform.History can still be
+		// unready when this runs.
+		waitFor(
+			function () { return Spicetify.Platform && Spicetify.Platform.History && Spicetify.Platform.History.listen; },
+			function () { Spicetify.Platform.History.listen(clearVimCursor); }
+		);
 
 		document.addEventListener("keydown", function (e) {
 			if (paletteOverlay || isTypingContext()) return;
+			// Someone else already handled it, or an IME is mid-composition
+			// (keyCode 229 covers Chromium builds that don't set isComposing
+			// on the first keydown).
+			if (e.defaultPrevented || e.isComposing || e.keyCode === 229) return;
+			// Never hijack shortcuts: Ctrl+K is Spotify's quick search, and
+			// Ctrl/Cmd/Alt + J/K/Enter/"/" belong to Spotify or the OS.
+			// metaKey is Cmd on macOS and the Win key on Windows. Windows
+			// also reports AltGr as Ctrl+Alt, which this rules out too.
+			if (e.ctrlKey || e.metaKey || e.altKey) return;
 
 			if (e.key === "/") {
+				// Shift is allowed here: AZERTY types "/" as Shift+":".
 				var search = document.querySelector(".main-topBar-searchBar, [data-testid=\"search-input\"]");
 				if (search) {
 					e.preventDefault();
@@ -1586,12 +1708,14 @@
 				return;
 			}
 
+			if (e.shiftKey) return;
 			if (e.key !== "j" && e.key !== "k" && e.key !== "Enter") return;
-			var rows = document.querySelectorAll(".main-trackList-trackListRow");
-			if (!rows.length) return;
 
 			if (e.key === "Enter") {
-				var current = rows[vimIndex];
+				// Only act on a row that is visibly highlighted right now, and
+				// never steal Enter from a focused control.
+				if (isInteractiveFocus()) return;
+				var current = currentVimRow();
 				if (current) {
 					e.preventDefault();
 					current.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true }));
@@ -1599,14 +1723,21 @@
 				return;
 			}
 
+			var rows = document.querySelectorAll(".main-trackList-trackListRow");
+			if (!rows.length) return;
+
+			// Recompute the position from the live element; "no selection"
+			// (or a stale row) starts at the first row for both j and k.
+			var live = currentVimRow();
+			var from = live ? Array.prototype.indexOf.call(rows, live) : -1;
+			var next = from === -1 ? 0 : Math.max(0, Math.min(rows.length - 1, from + (e.key === "j" ? 1 : -1)));
+
 			e.preventDefault();
-			vimIndex = Math.max(0, Math.min(rows.length - 1, vimIndex + (e.key === "j" ? 1 : -1)));
-			rows.forEach(function (r) {
-				r.classList.remove("terminal-vim-cursor");
-			});
-			var row = rows[vimIndex];
-			row.classList.add("terminal-vim-cursor");
-			row.scrollIntoView({ block: "nearest" });
+			clearVimCursor();
+			vimIndex = next;
+			vimRow = rows[next];
+			vimRow.classList.add("terminal-vim-cursor");
+			vimRow.scrollIntoView({ block: "nearest" });
 		});
 	}
 
@@ -1623,8 +1754,19 @@
 		// QWERTZ alike (not on Dvorak). Alt is excluded because Windows
 		// reports AltGr as Ctrl+Alt, so AltGr+Shift+K on some layouts
 		// would otherwise open the palette while typing a character.
+		//
+		// macOS: Cmd+Shift+K (e.metaKey) is accepted too, since Mac users
+		// reach for Cmd where others use Ctrl; Ctrl+Shift+K keeps working
+		// there as well. Spotify's own Mac bindings use Cmd+K (quick search)
+		// but nothing on Cmd+Shift+K, and macOS has no system-wide binding
+		// for it (Finder's "Go to Network" only applies inside Finder).
+		// Option (altKey) stays excluded, same as AltGr on Windows. Meta is
+		// honored only on macOS: on Linux/Windows it is the Super/Windows
+		// key, which the desktop or OS claims, so behavior there is
+		// unchanged — Ctrl+Shift+K only.
 		document.addEventListener("keydown", function (e) {
-			if (e.ctrlKey && e.shiftKey && !e.altKey && e.code === "KeyK") {
+			var mod = e.ctrlKey || (currentOs === "mac" && e.metaKey);
+			if (mod && e.shiftKey && !e.altKey && e.code === "KeyK") {
 				if (!settings.palette) return;
 				e.preventDefault();
 				toggleCommandPalette();
@@ -1705,8 +1847,10 @@
 		var parts = raw.replace(/^\//, "").split(/\s+/);
 		var cmd = parts[0].toLowerCase();
 		var arg = parts.slice(1).join(" ");
-		var handler = COMMANDS[cmd];
-		if (!handler) {
+		// Own-property check so Object.prototype members (constructor,
+		// __proto__, toString...) aren't treated as commands.
+		var handler = Object.prototype.hasOwnProperty.call(COMMANDS, cmd) ? COMMANDS[cmd] : null;
+		if (typeof handler !== "function") {
 			print("command not found: " + cmd, "err");
 			return;
 		}

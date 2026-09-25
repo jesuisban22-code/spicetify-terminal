@@ -5,6 +5,48 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-09-25
+
+### Added
+
+- macOS support on par with Linux and Windows. The theme already tagged
+  `<html>` with `terminal-os-mac`; macOS-only rules now live under that class
+  in `user.css`, so Linux and Windows render exactly as before.
+- Command palette: `Cmd+Shift+K` opens and closes it on macOS. `Ctrl+Shift+K`
+  still works on every OS; the Cmd (Meta) key is only honored on macOS, and
+  Option/AltGr still never triggers it. Spotify's own Mac shortcuts use
+  `Cmd+K` (quick search) but nothing on `Cmd+Shift+K`.
+- README: macOS listed as a supported platform (badge, platform section,
+  install notes with `~/.config/spicetify`, `Cmd+Shift+K`, Menlo fallback),
+  in English and French.
+
+### Fixed
+
+- Now-playing: a slow color/audio-features response for a track you already
+  skipped could land last and paint its accent, tempo and tempo markers over
+  the current track (and `stats` showed its tempo). Responses are still
+  cached under their own track but only applied if that track is current.
+- Now-playing: the previous track's accent, pulse tempo and tempo markers
+  stayed on podcasts, local files or when nothing was playing. They are now
+  cleared on every track change, falling back to the CSS defaults.
+- Track data (and so tempo markers, visualizer fallback and `stats`) was only
+  fetched while the pulse was enabled. It is now always fetched; only the
+  pulse's own colors depend on the setting, and toggling it applies at once.
+- ASCII covers: a recycled list row could keep the previous cover when an old
+  image finished loading after the new one; stale loads are now ignored and a
+  plain `src` swap triggers a redraw.
+- Vim navigation: the cursor is cleared on navigation, Enter only plays the
+  row that is actually highlighted and never steals Enter from a focused
+  button or field, and j/k/Enter/`/` ignore Ctrl/Cmd/Alt so Spotify's own
+  shortcuts (Ctrl+K quick search, etc.) work again.
+- Command palette: `constructor` and `__proto__` no longer resolve to
+  built-in object members; they print "command not found".
+- macOS: the window could not be dragged reliably while the boot sequence or
+  the command palette was open, because both full-screen overlays covered
+  Spotify's draggable top bar (hidden-inset title bar). The overlays' 32px
+  drag strip, already used on Windows, is now enabled on macOS too; the
+  traffic-light buttons stay clickable above it.
+
 ## [1.1.2] - 2026-09-25
 
 ### Fixed
@@ -85,6 +127,7 @@ Initial release (Linux).
   the progress bar, vim-style keyboard navigation, themed mini-player.
 - Settings panel to toggle every feature individually.
 
+[1.2.0]: https://github.com/jesuisban22-code/spicetify-terminal/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/jesuisban22-code/spicetify-terminal/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/jesuisban22-code/spicetify-terminal/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/jesuisban22-code/spicetify-terminal/compare/v1.0.0...v1.1.0
