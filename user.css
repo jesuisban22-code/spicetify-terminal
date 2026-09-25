@@ -651,7 +651,11 @@ main[tabindex="-1"]:focus-visible {
   font-size: 13px;
   line-height: 1.8;
   color: var(--term-text);
-  min-height: 8em;
+  /* Reserve the full final height up front: 5 log lines + the cursor line
+     at line-height 1.8 = 10.8em. The overlay centers its content
+     vertically, so any shortfall made the logo jump upward each time a
+     new line was typed. */
+  min-height: 10.8em;
 }
 
 .terminal-boot-log .ok {

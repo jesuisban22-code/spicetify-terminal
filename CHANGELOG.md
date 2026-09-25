@@ -5,6 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-09-25
+
+### Fixed
+
+- Boot sequence: the ASCII "Terminal" logo was misaligned (the dot of the
+  "i" and the top of the "l" sat in the wrong columns, and the second row was
+  shifted by one character).
+- Boot sequence: the logo no longer jumps upward while the log lines are
+  typed; the log now reserves its full final height from the first frame.
+- Boot log and `neofetch` showed "v1.0"; both now read the theme version.
+
 ## [1.1.0] - 2026-09-25
 
 Windows support. Linux rendering is unchanged.
@@ -58,5 +69,6 @@ Initial release (Linux).
   the progress bar, vim-style keyboard navigation, themed mini-player.
 - Settings panel to toggle every feature individually.
 
+[1.1.1]: https://github.com/jesuisban22-code/spicetify-terminal/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/jesuisban22-code/spicetify-terminal/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/jesuisban22-code/spicetify-terminal/releases/tag/v1.0.0
