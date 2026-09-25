@@ -5364,4 +5364,36 @@ html.terminal-full.terminal-crt-enabled::before {
   content: none !important;
   display: none !important;
 }
+
+/* Instant response (menus felt laggy on click): anything that opens from a
+   click — context menus and their items, dropdowns, tooltips, dialogs,
+   popups — appears on the very next frame, like a terminal. The v1.2 menu
+   "bounce" (220 ms), the 200 ms fade and the 20 ms-per-item stagger meant
+   the last menu item was readable only ~350 ms after the click. List rows
+   (tracklists, queue, friends) no longer fade in one after another either:
+   a page shows complete as soon as it is drawn. */
+html.terminal-full .main-contextMenu-menu,
+html.terminal-full .main-contextMenu-menu > li,
+html.terminal-full [role="menu"],
+html.terminal-full [role="menu"] > li,
+html.terminal-full [role="menuitem"],
+html.terminal-full [role="listbox"],
+html.terminal-full [role="tooltip"],
+html.terminal-full .tippy-box,
+html.terminal-full .main-contextMenu-tippy,
+html.terminal-full .GenericModal,
+html.terminal-full [role="dialog"],
+html.terminal-full .spicetify-popup,
+html.terminal-full .Root__main-view .main-trackList-trackListRow,
+html.terminal-full #Desktop_PanelContainer_Id [data-encore-id="listRow"],
+html.terminal-full .main-nowPlayingView-queueItem,
+html.terminal-full .main-buddyFeed-friendActivity,
+html.terminal-full .main-devicePicker-devicesList > li {
+  animation: none !important;
+}
+html.terminal-full .main-contextMenu-menuItemButton,
+html.terminal-full .main-contextMenu-menuItemButton::before,
+html.terminal-full [role="menuitem"] {
+  transition: none !important;
+}
 /* --- END FULL/CHROME ----------------------------------------------------- */
