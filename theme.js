@@ -473,6 +473,16 @@
 	// =======================================================================
 	var lastExtractedColor = null; // last raw hex from colorExtractor, pre-mood-tint
 	var lastAudioFeatures = null;
+	// URI of the track apply() last ran for. colorExtractor / audio-features
+	// resolve asynchronously, so when skipping quickly the previous track's
+	// response can land after the new track's — each .then() checks this
+	// before touching the DOM or the last* globals (it still fills the cache
+	// under its own URI, so replaying that track stays instant).
+	var currentTrackUri = null;
+
+	function isCurrentTrack(uri) {
+		return uri === currentTrackUri;
+	}
 
 	// Cover color + audio-features by track URI, so replaying a track this
 	// session re-applies instantly from memory instead of re-fetching both
@@ -483,6 +493,7 @@
 	function setupNowPlayingPulse() {
 		function apply(uri) {
 			if (!settings.pulse || !uri) return;
+			currentTrackUri = uri;
 			var trackId = uri.split(":")[2];
 			lastExtractedColor = null;
 			lastAudioFeatures = null;
@@ -511,8 +522,9 @@
 					.then(function (colors) {
 						var accent = (colors && (colors.VIBRANT || colors.PROMINENT || colors.LIGHT_VIBRANT)) || null;
 						if (accent) {
-							lastExtractedColor = accent;
 							trackDataCache[uri].color = accent;
+							if (!isCurrentTrack(uri)) return; // stale: user already skipped
+							lastExtractedColor = accent;
 							document.documentElement.style.setProperty("--track-accent", accent);
 							if (lastAudioFeatures) applyMoodTint(lastAudioFeatures);
 						}
@@ -530,6 +542,8 @@
 						"?format=json"
 				)
 					.then(function (data) {
+						trackDataCache[uri].features = data;
+						if (!isCurrentTrack(uri)) return; // stale: user already skipped
 						var tempo = data && data.tempo;
 						if (tempo && tempo > 20 && tempo < 300) {
 							// 2 beats per breathing cycle — max-intensity pass: faster,
@@ -538,7 +552,6 @@
 							document.documentElement.style.setProperty("--track-bpm-ms", ms + "ms");
 						}
 						lastAudioFeatures = data;
-						trackDataCache[uri].features = data;
 						if (lastExtractedColor) applyMoodTint(data);
 						renderTempoMarkers();
 					})
