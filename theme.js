@@ -27,6 +27,9 @@
 	// resolves exactly the same face it always has, even if it happens to
 	// have Cascadia installed; Cascadia/Consolas only get reached on
 	// Windows (Menlo on macOS), where none of the Linux faces exist.
+	// Shown by the boot log and `neofetch`; keep in sync with CHANGELOG.md.
+	var THEME_VERSION = "1.1.1";
+
 	var TERM_FONT_STACK =
 		"'JetBrains Mono', 'Fira Code', 'Hack', 'DejaVu Sans Mono', " +
 		"'Cascadia Mono', 'Cascadia Code', 'Consolas', 'Menlo', monospace";
@@ -238,14 +241,14 @@
 		if (!settings.boot) return;
 
 		var LOGO = [
-			" _____                   _             _ ",
-			"|_   _|__ _ _ _ __  (_)_ _  __ _| |",
+			" _____              _           _ ",
+			"|_   _|__ _ _ _ __ (_)_ _  __ _| |",
 			"  | |/ -_) '_| '  \\| | ' \\/ _` | |",
 			"  |_|\\___|_| |_|_|_|_|_||_\\__,_|_|"
 		].join("\n");
 
 		var LINES = [
-			"spicetify-terminal v1.0",
+			"spicetify-terminal v" + THEME_VERSION,
 			"mounting /library ......... OK",
 			"establishing session ...... OK",
 			"loading audio subsystem ... OK",
@@ -1763,7 +1766,7 @@
 			var lines = [
 				currentDisplayName() + "@spicetify",
 				"----------------",
-				"OS        spicetify-terminal v1.0 (" + (Spicetify.Platform && Spicetify.Platform.operatingSystem ? Spicetify.Platform.operatingSystem : "unknown") + ")",
+				"OS        spicetify-terminal v" + THEME_VERSION + " (" + (Spicetify.Platform && Spicetify.Platform.operatingSystem ? Spicetify.Platform.operatingSystem : "unknown") + ")",
 				"host      Spotify " + (Spicetify.Config && Spicetify.Config.version ? Spicetify.Config.version : "web"),
 				"uptime    " + upStr,
 				"shell     terminal command palette",
