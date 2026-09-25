@@ -246,7 +246,9 @@
 /* ---------- Respect reduced-motion globally, for every animation above and
    below (single source of truth, rather than re-checking per feature) ------ */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+*::before,
+*::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -413,7 +415,7 @@
 
 /* Clip the scaled pre to its container's bounds regardless of whether that
    container already had overflow:hidden of its own. */
-:has(> .terminal-ascii-art) {
+.terminal-ascii-host {
   overflow: hidden !important;
 }
 
@@ -571,7 +573,9 @@
 
 /* ---------- Smooth color transitions app-wide (additive; more specific
    Spotify rules still win, this only fills gaps where none exist) --------- */
-a, button, [role="button"] {
+a,
+button,
+[role="button"] {
   transition: color 150ms ease-out, background-color 150ms ease-out, border-color 150ms ease-out;
 }
 
@@ -996,3 +1000,4400 @@ html.terminal-os-mac .terminal-drag-strip {
 html.terminal-os-mac #terminal-boot-overlay.terminal-boot-hide .terminal-drag-strip {
   display: none;
 }
+
+/* ==========================================================================
+   FULL CONVERSION — "mode terminal complet" (settings.fullConversion).
+   Every rule below is scoped under html.terminal-full so turning the
+   setting off restores the v1.2.0 look exactly. Shared tokens first; each
+   region has its own section.
+   ========================================================================== */
+html.terminal-full {
+  --tf-gap: 6px;              /* gutter between panes */
+  --tf-pane-border: 1px solid var(--term-border);
+  --tf-pane-border-active: 1px solid var(--term-green);
+  --tf-title-h: 22px;         /* pane title bar height */
+  --tf-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --tf-fast: 120ms;
+  --tf-med: 200ms;
+  --tf-slow: 320ms;
+}
+
+/* --- FULL/SHELL (agent A) ------------------------------------------------ */
+/* Global layout, top bar, library, scrollbars, resize handles.
+   Spotify's three rounded floating panels become tmux panes: square, a 1px
+   frame, a title bar holding [n:name], and the pane under the pointer (or,
+   when nothing is hovered, the one holding focus) turns green. */
+
+html.terminal-full {
+  --tf-shell-gutter: var(--term-bg-tinted-press);   /* between panes */
+  --tf-shell-title-bg: var(--term-bg-tinted);       /* pane title bars */
+  --tf-shell-line: var(--term-border);              /* pane frames */
+}
+
+/* ---------- 1. Panes ------------------------------------------------------
+   Gutters keep Spotify's own --panel-gap on purpose. It also sets the
+   outer padding of the whole grid, i.e. how far the top bar's right end
+   sits from the window edge, and on Windows that is where the caption
+   buttons are drawn: shrinking it would push the top bar's content 2px
+   closer to them. The gutter just gets darker than the panes instead. */
+html.terminal-full .Root__top-container {
+  background-color: var(--tf-shell-gutter) !important;
+}
+
+/* The frame. The title bar is the pane's own top BORDER (22px), not
+   padding and not a child: Spotify positions absolute children (the main
+   view's sticky top bar, the resize handles) from the padding box, which
+   starts below the border, so they all move down with the content instead
+   of sliding under the title. The border's three colors (outer line, title
+   fill, separator line) come from one border-image gradient; the slice
+   "22" must match --tf-title-h. Right sidebar only once it has content:
+   when closed its column is ~0px wide and a frame would draw a stray
+   sliver. */
+html.terminal-full .Root__nav-bar,
+html.terminal-full .Root__main-view,
+html.terminal-full .Root__right-sidebar:has(aside:not(:empty)) {
+  --tf-pane-line: var(--tf-shell-line);
+  box-sizing: border-box !important;
+  border-style: solid !important;
+  border-width: var(--tf-title-h) 1px 1px 1px !important;
+  border-color: var(--tf-pane-line) !important;
+  border-image: linear-gradient(
+      to bottom,
+      var(--tf-pane-line) 0, var(--tf-pane-line) 1px,
+      var(--tf-shell-title-bg) 1px, var(--tf-shell-title-bg) calc(var(--tf-title-h) - 1px),
+      var(--tf-pane-line) calc(var(--tf-title-h) - 1px), var(--tf-pane-line) 100%
+    ) 22 1 1 1 / var(--tf-title-h) 1px 1px 1px !important;
+  border-radius: 0 !important;
+  background-color: var(--term-bg) !important;
+  box-shadow: none !important;
+}
+
+/* Active pane: hovered, else focused (so two panes never light up at once:
+   the one under the pointer wins over the one holding keyboard focus). */
+/* (Removed: changing --tf-pane-line on :hover / :focus-within re-styled
+   every descendant of the pane — thousands of nodes — on each pointer
+   move between panes, and the :has(:hover) guard re-matched the whole app
+   on every hover change. The active pane is now shown by its title in
+   #tf-pane-titles, which theme.js updates without touching the panes.) */
+
+/* Title text. position:fixed with top/left left at auto keeps the box at
+   its static position (top-left of the pane's content box) while escaping
+   the pane's overflow:hidden, which would otherwise clip anything drawn in
+   the border area; the negative top margin lifts it into the title bar.
+   Same technique the spicetify "text" theme uses for its pane labels.
+   Escaping overflow also means nothing clips a long title to its pane
+   (the main one can be ~70 chars), so the width is capped with an
+   ellipsis and the label is filled with the title-bar colour: if a title
+   still runs past its pane, the next pane's title paints over it instead
+   of the two texts being drawn on top of each other. place-self pins the
+   static position to the start corner whatever alignment the pane's own
+   flex/grid layout uses. */
+html.terminal-full .Root__nav-bar::before,
+html.terminal-full .Root__main-view::before,
+html.terminal-full .Root__right-sidebar:has(aside:not(:empty))::before {
+  position: fixed;
+  z-index: 3;
+  margin: calc(var(--tf-title-h) * -1 + 3px) 0 0 6px;
+  padding: 0 6px;
+  height: calc(var(--tf-title-h) - 6px);
+  line-height: calc(var(--tf-title-h) - 6px);
+  font-family: var(--term-font);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+  white-space: nowrap;
+  max-width: min(64ch, 40vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  place-self: start;
+  color: var(--term-subdued);
+  background: var(--tf-shell-title-bg);
+  pointer-events: none;
+  animation: tf-shell-title-in var(--tf-slow) steps(4, end) backwards;
+}
+
+html.terminal-full .Root__nav-bar::before {
+  content: "[0:~/library]";
+  animation-delay: 60ms;
+}
+
+html.terminal-full .Root__main-view::before {
+  content: var(--tf-main-title, "[1:~/home]");
+  animation-delay: 120ms;
+}
+
+html.terminal-full .Root__right-sidebar {
+  --tf-right-title: "[2:now-playing]";
+}
+html.terminal-full .Root__right-sidebar:has(#queue-panel, [data-testid="queue-page"]) {
+  --tf-right-title: "[2:queue]";
+}
+html.terminal-full .Root__right-sidebar:has([data-testid="buddy-feed"]) {
+  --tf-right-title: "[2:friends]";
+}
+html.terminal-full .Root__right-sidebar:has(aside:not(:empty))::before {
+  content: var(--tf-right-title);
+  animation-delay: 180ms;
+}
+
+/* Collapsed library rail is ~72px: the full label would spill over the
+   main pane's title. */
+html.terminal-full .Root__nav-bar:has(.main-yourLibraryX-libraryIsCollapsed)::before {
+  content: "[0]";
+}
+
+/* Active title: inverse video + a short stepped reveal each time the pane
+   becomes active (the animation restarts because the rule starts matching). */
+html.terminal-full .tf-never-matches::before {
+  color: var(--term-bg);
+  background: var(--term-green);
+  animation: tf-shell-title-active var(--tf-med) steps(3, end);
+}
+
+@keyframes tf-shell-title-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes tf-shell-title-active {
+  from { opacity: 0.35; transform: translateX(-6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Panes fade in on load, staggered left to right. Opacity only: a
+   transform on the pane would make it the containing block of its fixed
+   title and clip it for the duration. `backwards` so nothing lingers
+   (no stacking context, no compositing) once it has played. */
+html.terminal-full .Root__globalNav,
+html.terminal-full .Root__nav-bar,
+html.terminal-full .Root__main-view,
+html.terminal-full .Root__right-sidebar {
+  animation: tf-shell-pane-in var(--tf-slow) var(--tf-ease) backwards;
+}
+html.terminal-full .Root__nav-bar { animation-delay: 60ms; }
+html.terminal-full .Root__main-view { animation-delay: 120ms; }
+html.terminal-full .Root__right-sidebar { animation-delay: 180ms; }
+
+@keyframes tf-shell-pane-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Inner surfaces that carried the panel's rounding and its own fill. */
+html.terminal-full .Root__globalNav *,
+html.terminal-full .Root__nav-bar *,
+html.terminal-full .Root__main-view > *,
+html.terminal-full .main-view-container,
+html.terminal-full .Root__right-sidebar > *,
+html.terminal-full .Root__right-sidebar aside,
+html.terminal-full #Desktop_PanelContainer_Id {
+  border-radius: 0 !important;
+}
+
+html.terminal-full .Root__nav-bar .main-yourLibraryX-entryPoints,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-library,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryContainer {
+  background-color: var(--term-bg) !important;
+  box-shadow: none !important;
+}
+
+/* ---------- 1b. Resize handles: a thin │ rule in the gutter --------------
+   The handle element keeps Spotify's size and position (its hit area);
+   only the line it draws changes. */
+html.terminal-full .LayoutResizer__resize-bar {
+  cursor: col-resize;
+}
+
+html.terminal-full .LayoutResizer__resize-bar::after {
+  background-color: var(--term-green) !important;
+  width: 1px !important;
+  border-radius: 0 !important;
+  opacity: 0;
+  transition: opacity var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .LayoutResizer__resize-bar:hover::after,
+html.terminal-full .LayoutResizer__resize-bar--resizing::after,
+html.terminal-full .LayoutResizer__resize-bar:focus-within::after {
+  opacity: 1;
+}
+
+/* ---------- 1c. Scrollbars: thin square rails --------------------------- */
+html.terminal-full ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+html.terminal-full ::-webkit-scrollbar-thumb {
+  border-radius: 0;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+html.terminal-full ::-webkit-scrollbar-thumb:hover {
+  background-color: var(--term-green);
+}
+
+html.terminal-full ::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* OverlayScrollbars (library list, some panes) */
+html.terminal-full .os-scrollbar-handle {
+  border-radius: 0 !important;
+  background: var(--term-border) !important;
+}
+
+html.terminal-full .os-scrollbar-handle:hover,
+html.terminal-full .os-scrollbar-handle.active {
+  background: var(--term-green) !important;
+}
+
+/* ---------- 2. Top bar: a shell prompt -----------------------------------
+   Nothing here changes the global nav's height, paddings or
+   -webkit-app-region: those are what keep the window draggable and leave
+   room for the Windows caption buttons (top right) and the macOS traffic
+   lights (top left). Only children are restyled. */
+html.terminal-full .Root__globalNav {
+  background-color: var(--tf-shell-gutter) !important;
+}
+
+/* user@terminal:~/dir$  — before the back/forward buttons, i.e. after
+   whatever space Spotify reserves for the traffic lights on macOS. */
+html.terminal-full .main-globalNav-historyButtons {
+  align-items: center;
+  gap: 4px !important;
+}
+
+html.terminal-full .main-globalNav-historyButtons::before {
+  content: var(--tf-prompt, "user@terminal:~$");
+  order: -1;
+  align-self: center;
+  margin-inline-end: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--term-green);
+  white-space: nowrap;
+  /* theme.js fills in the real user and directory (up to ~50 chars), so
+     the breakpoints below can't be the only guard against running into
+     the centered search box. */
+  min-width: 0;
+  max-width: 26ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+/* The search box is centered in the window, so on narrower windows the
+   prompt shortens, then goes, before the two could overlap. */
+@media (max-width: 1180px) {
+  html.terminal-full .main-globalNav-historyButtons::before {
+    content: var(--tf-prompt-short, "~$");
+  }
+}
+@media (max-width: 920px) {
+  html.terminal-full .main-globalNav-historyButtons::before {
+    content: none;
+  }
+}
+
+/* Shared look for every top-bar icon button: a square, framed key. */
+html.terminal-full .main-globalNav-historyButtons > button,
+html.terminal-full [data-testid="top-bar-back-button"],
+html.terminal-full [data-testid="top-bar-forward-button"],
+html.terminal-full :is(.main-globalNav-searchContainer > button, [data-testid="home-button"], .Root__globalNav .main-globalNav-navLink),
+html.terminal-full .main-globalNav-browseButtonWrapper button,
+html.terminal-full .Root__globalNav .main-topBar-buddyFeed,
+html.terminal-full .Root__globalNav .main-globalNav-buddyFeed,
+html.terminal-full .Root__globalNav .main-topBar-whatsNewFeed,
+html.terminal-full .Root__globalNav [data-testid="user-widget-link"] {
+  border-radius: 0 !important;
+  border: 1px solid var(--term-border) !important;
+  background: var(--term-bg) !important;
+  color: var(--term-text) !important;
+  box-shadow: none !important;
+  transform: none !important;
+  min-width: 32px;
+  min-height: 32px;
+  font-family: var(--term-font);
+  transition: border-color var(--tf-fast) var(--tf-ease), color var(--tf-fast) var(--tf-ease), background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .main-globalNav-historyButtons > button:hover:not(:disabled),
+html.terminal-full [data-testid="top-bar-back-button"]:hover:not(:disabled),
+html.terminal-full [data-testid="top-bar-forward-button"]:hover:not(:disabled),
+html.terminal-full :is(.main-globalNav-searchContainer > button, [data-testid="home-button"], .Root__globalNav .main-globalNav-navLink):hover,
+html.terminal-full .main-globalNav-browseButtonWrapper button:hover,
+html.terminal-full .Root__globalNav .main-topBar-buddyFeed:hover,
+html.terminal-full .Root__globalNav .main-globalNav-buddyFeed:hover,
+html.terminal-full .Root__globalNav .main-topBar-whatsNewFeed:hover,
+html.terminal-full .Root__globalNav [data-testid="user-widget-link"]:hover {
+  border-color: var(--term-green) !important;
+  color: var(--term-green) !important;
+}
+
+/* Back / forward: ‹ › glyphs. Positions 1 and 2 are the native pair;
+   Spicetify Topbar buttons (ours included) are appended after them and
+   keep their own icons. */
+html.terminal-full .main-globalNav-historyButtons > button:is(:nth-child(1), :nth-child(2)),
+html.terminal-full [data-testid="top-bar-back-button"],
+html.terminal-full [data-testid="top-bar-forward-button"] {
+  width: 32px;
+  height: 32px;
+  padding: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+html.terminal-full .main-globalNav-historyButtons > button:is(:nth-child(1), :nth-child(2)) svg,
+html.terminal-full :is([data-testid="top-bar-back-button"], [data-testid="top-bar-forward-button"]) svg {
+  display: none !important;
+}
+
+html.terminal-full .main-globalNav-historyButtons > button:nth-child(1)::before,
+html.terminal-full [data-testid="top-bar-back-button"]::before {
+  content: "‹";
+}
+html.terminal-full .main-globalNav-historyButtons > button:nth-child(2)::before,
+html.terminal-full [data-testid="top-bar-forward-button"]::before {
+  content: "›";
+}
+html.terminal-full .main-globalNav-historyButtons > button:is(:nth-child(1), :nth-child(2))::before,
+html.terminal-full [data-testid="top-bar-back-button"]::before,
+html.terminal-full [data-testid="top-bar-forward-button"]::before {
+  font-size: 20px;
+  line-height: 1;
+  margin-top: -2px;
+}
+
+html.terminal-full .main-globalNav-historyButtons > button:disabled,
+html.terminal-full [data-testid="top-bar-back-button"]:disabled,
+html.terminal-full [data-testid="top-bar-forward-button"]:disabled {
+  opacity: 0.35;
+}
+
+/* Other Spicetify buttons in that row: square and flat like the rest. */
+html.terminal-full .main-globalNav-historyButtons > button {
+  width: 32px;
+  height: 32px;
+}
+
+/* Home: ⌂ ~ */
+html.terminal-full :is(.main-globalNav-searchContainer > button, [data-testid="home-button"], .Root__globalNav .main-globalNav-navLink) {
+  width: auto !important; /* height stays native: it matches the field */
+  padding: 0 12px !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-end: 6px;
+}
+
+html.terminal-full :is(.main-globalNav-searchContainer > button, [data-testid="home-button"], .Root__globalNav .main-globalNav-navLink) svg {
+  display: none !important;
+}
+
+html.terminal-full :is(.main-globalNav-searchContainer > button, [data-testid="home-button"], .Root__globalNav .main-globalNav-navLink)::before {
+  content: "⌂ ~";
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+html.terminal-full :is(.main-globalNav-searchContainer > button, [data-testid="home-button"], .Root__globalNav .main-globalNav-navLink):is(.main-globalNav-navLinkActive, [aria-current="page"]) {
+  color: var(--term-green) !important;
+  border-color: var(--term-green-dim) !important;
+}
+
+/* Search: a command line. ⌕ prompt glyph, "rechercher…" as placeholder,
+   a blinking block caret while focused and empty, the native caret
+   (green, block where supported) once typing. :has(input) makes sure the
+   wrapper really wraps the field before we draw on it. */
+html.terminal-full .main-globalNav-searchInputContainer:has(input) {
+  position: relative;
+}
+
+html.terminal-full .Root__globalNav input[data-testid="search-input"],
+html.terminal-full .Root__globalNav .main-globalNav-searchInputText:not(tf-nx),
+html.terminal-full .Root__globalNav input.main-topBar-searchBar {
+  border-radius: 0 !important;
+  border: 1px solid var(--term-border) !important;
+  background: var(--term-bg) !important;
+  box-shadow: none !important;
+  outline: none !important; /* focus shows as the green frame below */
+  padding-inline-start: 34px !important;
+  color: var(--term-text) !important;
+  font-size: 13px !important;
+  caret-color: var(--term-green);
+  caret-shape: block;
+  transition: border-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__globalNav input[data-testid="search-input"]:hover,
+html.terminal-full .Root__globalNav .main-globalNav-searchInputText:not(tf-nx):hover,
+html.terminal-full .Root__globalNav input.main-topBar-searchBar:hover {
+  border-color: var(--term-subdued) !important;
+}
+
+html.terminal-full .Root__globalNav input[data-testid="search-input"]:focus,
+html.terminal-full .Root__globalNav .main-globalNav-searchInputText:not(tf-nx):focus,
+html.terminal-full .Root__globalNav input.main-topBar-searchBar:focus {
+  border-color: var(--term-green) !important;
+}
+
+html.terminal-full .Root__globalNav input[data-testid="search-input"]::placeholder,
+html.terminal-full .Root__globalNav .main-globalNav-searchInputText:not(tf-nx)::placeholder,
+html.terminal-full .Root__globalNav input.main-topBar-searchBar::placeholder {
+  color: var(--term-subdued) !important;
+  opacity: 1;
+}
+
+/* The native magnifier (not inside a button) gives way to the glyph. */
+html.terminal-full .main-globalNav-searchInputContainer:has(input) svg:not(button svg) {
+  display: none !important;
+}
+
+html.terminal-full .main-globalNav-searchInputContainer:has(input)::before,
+html.terminal-full .main-globalNav-searchInputContainer:has(input)::after {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-size: 13px;
+  line-height: 1;
+  z-index: 1;
+}
+
+html.terminal-full .main-globalNav-searchInputContainer:has(input)::before {
+  content: "⌕";
+  left: 12px;
+  font-size: 15px;
+  color: var(--term-green);
+}
+
+
+
+/* Browse (next to the field) and the Ctrl K hint */
+html.terminal-full .main-globalNav-browseButtonWrapper button {
+  width: 32px;
+  height: 32px;
+  padding: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+html.terminal-full .main-globalNav-browseButtonWrapper button svg {
+  display: none !important;
+}
+
+html.terminal-full .main-globalNav-browseButtonWrapper button::before {
+  content: "≡";
+  font-size: 16px;
+  line-height: 1;
+}
+
+html.terminal-full .main-globalNav-browseButtonWrapper {
+  border: 0 !important;
+  background: transparent !important;
+}
+
+html.terminal-full .main-globalNav-searchInputKBDWrapper kbd,
+html.terminal-full .main-globalNav-searchInputKBDWrapper span {
+  border-radius: 0 !important;
+  font-size: 10px !important;
+  color: var(--term-subdued) !important;
+}
+
+/* Right cluster: upsells, install-app and any Spotify logo go; What's New
+   and Friends become labelled keys; the avatar goes square. */
+html.terminal-full .Root__globalNav .main-topBar-UpgradeButton:not(tf-nx),
+html.terminal-full .Root__globalNav [data-testid="upgrade-button"]:not(tf-nx),
+html.terminal-full .Root__globalNav .upgrade-button:not(tf-nx),
+html.terminal-full .Root__globalNav a[href*="spotify.com/premium"],
+html.terminal-full .Root__globalNav a[href*="/premium"],
+html.terminal-full .Root__globalNav a[href*="/download"],
+html.terminal-full .Root__globalNav [data-testid="download-app-button"]:not(tf-nx),
+html.terminal-full .Root__globalNav [data-testid="install-app-button"]:not(tf-nx),
+html.terminal-full .Root__globalNav a[aria-label="Spotify"],
+html.terminal-full .Root__globalNav [data-testid="spotify-logo"]:not(tf-nx),
+html.terminal-full .main-topBar-topbarContentRight > button:has(a[href*="/download"]),
+html.terminal-full .main-userWidget-setupPlan {
+  display: none !important;
+}
+
+html.terminal-full .Root__globalNav .main-topBar-buddyFeed,
+html.terminal-full .Root__globalNav .main-globalNav-buddyFeed,
+html.terminal-full .Root__globalNav .main-topBar-whatsNewFeed {
+  width: auto !important;
+  height: 32px !important;
+  padding: 0 8px !important;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+}
+
+html.terminal-full .Root__globalNav :is(.main-topBar-buddyFeed, .main-globalNav-buddyFeed, .main-topBar-whatsNewFeed) svg {
+  display: none !important;
+}
+
+html.terminal-full .Root__globalNav .main-topBar-whatsNewFeed::before {
+  content: "✱ news";
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+html.terminal-full .Root__globalNav .main-topBar-buddyFeed::before,
+html.terminal-full .Root__globalNav .main-globalNav-buddyFeed::before {
+  content: "☺ amis";
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+html.terminal-full .Root__globalNav .main-topBar-buddyFeedActive,
+html.terminal-full .Root__globalNav .main-topBar-whatsNewFeedActive {
+  color: var(--term-bg) !important;
+  background: var(--term-green) !important;
+  border-color: var(--term-green) !important;
+}
+
+html.terminal-full .Root__globalNav .main-topBar-whatsNewFeedNotificationDot,
+html.terminal-full .Root__globalNav .main-userWidget-notificationDot {
+  border-radius: 0 !important;
+  background: var(--term-orange) !important;
+  box-shadow: none !important;
+}
+
+html.terminal-full .Root__globalNav [data-testid="user-widget-link"] {
+  padding: 2px !important;
+  width: auto !important;
+  height: 32px !important;
+}
+
+html.terminal-full .Root__globalNav .main-avatar-avatar:not(tf-nx),
+html.terminal-full .Root__globalNav .main-avatar-image:not(tf-nx),
+html.terminal-full .Root__globalNav [data-testid="user-widget-link"] figure,
+html.terminal-full .Root__globalNav [data-testid="user-widget-link"] img {
+  border-radius: 0 !important;
+  width: 26px !important;
+  height: 26px !important;
+}
+
+/* ---------- 2b. OS window chrome -----------------------------------------
+   No OS-specific override is needed: nothing above touches the global
+   nav's height, paddings, spacers or -webkit-app-region, so Spotify keeps
+   reserving the Windows caption-button area (top right, ~140px) and the
+   macOS traffic-light area (top left, ~80px) itself, and the window stays
+   draggable from the same places. Every glyph and label we add lives
+   inside a native button (already no-drag) or is pointer-events:none.
+   Checked in the fixture for both OSes (scratchpad full/A/shell.test.js):
+   padding, app-region and the spacer boxes are identical with the class
+   on and off, and nothing we draw overlaps either reserve. */
+
+/* ---------- 3. Left sidebar: a file tree ---------------------------------- */
+/* Header: ☰ ~/library, ＋ créer */
+html.terminal-full .main-yourLibraryX-header {
+  box-shadow: none !important;
+  border-bottom: 1px solid var(--term-border);
+  padding-block: 6px !important;
+}
+
+html.terminal-full .main-yourLibraryX-collapseButton {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  font-size: 0 !important; /* native label stays for screen readers */
+  color: var(--term-text) !important;
+  background: transparent !important;
+}
+
+/* The native label sits in an encore text span that sets its own
+   font-size, so the button's font-size:0 alone doesn't reach it. */
+html.terminal-full .main-yourLibraryX-collapseButton * {
+  font-size: 0 !important;
+}
+
+html.terminal-full .main-yourLibraryX-collapseButton svg {
+  display: none !important;
+}
+
+html.terminal-full .main-yourLibraryX-collapseButton::before {
+  content: "☰";
+  font-size: 15px;
+  line-height: 1;
+  color: var(--term-green);
+}
+
+html.terminal-full .main-yourLibraryX-collapseButton::after {
+  content: "~/library";
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+html.terminal-full .main-yourLibraryX-collapseButton:hover {
+  color: var(--term-green) !important;
+}
+
+html.terminal-full .main-yourLibraryX-collapseButtonIsCollapsed.main-yourLibraryX-collapseButtonIsCollapsed::after,
+html.terminal-full .main-yourLibraryX-libraryIsCollapsed .main-yourLibraryX-collapseButton::after {
+  content: none;
+}
+
+html.terminal-full .main-yourLibraryX-collapseButtonIsCollapsed.main-yourLibraryX-collapseButtonIsCollapsed,
+html.terminal-full .main-yourLibraryX-libraryIsCollapsed .main-yourLibraryX-collapseButton {
+  justify-content: center;
+  min-width: 32px;
+}
+
+/* Create (+ Créer) and the other header keys */
+html.terminal-full .main-yourLibraryX-header .main-yourLibraryX-createButton:not(tf-nx),
+html.terminal-full .main-yourLibraryX-header .main-yourLibraryX-button:not(tf-nx),
+html.terminal-full .main-yourLibraryX-header button[data-encore-id] {
+  border-radius: 0 !important;
+  border: 1px solid var(--term-border) !important;
+  background: transparent !important;
+  color: var(--term-text) !important;
+  box-shadow: none !important;
+  min-width: 32px;
+  min-height: 32px;
+  transform: none !important;
+}
+
+html.terminal-full .main-yourLibraryX-header .main-yourLibraryX-createButton:not(tf-nx):hover,
+html.terminal-full .main-yourLibraryX-header .main-yourLibraryX-button:not(tf-nx):hover,
+html.terminal-full .main-yourLibraryX-header button[data-encore-id]:hover {
+  border-color: var(--term-green) !important;
+  color: var(--term-green) !important;
+}
+
+html.terminal-full .main-yourLibraryX-header .main-yourLibraryX-createButton {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 10px !important;
+  font-size: 12px !important;
+}
+
+html.terminal-full .main-yourLibraryX-header .main-yourLibraryX-createButton svg {
+  display: none !important;
+}
+
+html.terminal-full .main-yourLibraryX-header .main-yourLibraryX-createButton::before {
+  content: "＋";
+  font-size: 13px;
+  line-height: 1;
+  color: var(--term-green);
+}
+
+/* Filter chips -> [playlists] [artistes] tabs; the selected one in
+   inverse video. The brackets go on the inner label only, so a build that
+   drops the inner span loses the brackets, never doubles them. */
+html.terminal-full .main-yourLibraryX-filterArea :is(button, [role="checkbox"], [role="option"], [data-encore-id="chip"]) {
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  min-height: 32px;
+  padding: 0 !important;
+}
+
+html.terminal-full .main-yourLibraryX-filterArea [class*="ChipInnerComponent"] {
+  border-radius: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: var(--term-subdued) !important;
+  padding: 2px 6px !important;
+  font-size: 12px !important;
+  text-transform: lowercase;
+  transition: color var(--tf-fast) var(--tf-ease), background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .main-yourLibraryX-filterArea [class*="ChipInnerComponent"]::before {
+  content: "[";
+}
+
+html.terminal-full .main-yourLibraryX-filterArea [class*="ChipInnerComponent"]::after {
+  content: "]";
+}
+
+html.terminal-full .main-yourLibraryX-filterArea :is(button, [data-encore-id="chip"]):hover [class*="ChipInnerComponent"] {
+  color: var(--term-text) !important;
+}
+
+html.terminal-full .main-yourLibraryX-filterArea [class*="ChipInnerComponent-selected"],
+html.terminal-full .main-yourLibraryX-filterArea :is([aria-checked="true"], [aria-pressed="true"], [aria-selected="true"]) [class*="ChipInnerComponent"] {
+  background: var(--term-green) !important;
+  color: var(--term-bg) !important;
+}
+
+/* Sort + filter row */
+html.terminal-full .Root__nav-bar .x-filterBox-expandButton:not(tf-nx),
+html.terminal-full .Root__nav-bar .x-sortBox-sortDropdown:not(tf-nx),
+html.terminal-full .Root__nav-bar .main-yourLibraryX-librarySortWrapper button {
+  border-radius: 0 !important;
+  min-height: 32px;
+  min-width: 32px;
+  color: var(--term-subdued) !important;
+  background: transparent !important;
+  transform: none !important;
+}
+
+html.terminal-full .Root__nav-bar .x-filterBox-expandButton:not(tf-nx):hover,
+html.terminal-full .Root__nav-bar .x-sortBox-sortDropdown:not(tf-nx):hover,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-librarySortWrapper button:hover {
+  color: var(--term-green) !important;
+}
+
+html.terminal-full .Root__nav-bar .x-filterBox-expandButton svg {
+  display: none !important;
+}
+
+html.terminal-full .Root__nav-bar .x-filterBox-expandButton::before {
+  content: "⌕";
+  font-size: 16px;
+  line-height: 1;
+}
+
+html.terminal-full .Root__nav-bar .x-sortBox-sortDropdown:not(tf-nx),
+html.terminal-full .Root__nav-bar .main-yourLibraryX-librarySortWrapper button {
+  font-size: 12px !important;
+  gap: 6px;
+}
+
+html.terminal-full .Root__nav-bar .x-filterBox-filterInput {
+  border-radius: 0 !important;
+  border: 1px solid var(--term-border) !important;
+  background: var(--term-bg) !important;
+  color: var(--term-text) !important;
+  caret-color: var(--term-green);
+  font-size: 12px !important;
+  height: 32px;
+}
+
+html.terminal-full .Root__nav-bar .x-filterBox-filterInput:focus {
+  border-color: var(--term-green) !important;
+  outline: none !important;
+}
+
+html.terminal-full .Root__nav-bar .x-filterBox-searchIcon {
+  color: var(--term-green) !important;
+  fill: var(--term-green) !important;
+}
+
+/* Rows -> tree. The ├─ / └─ connectors are drawn with 1px lines rather
+   than box-drawing glyphs: rows are 48-64px tall, and glyphs would leave
+   gaps in the vertical rule between rows. List mode only: grid mode
+   (cards) and the collapsed rail keep plain tiles. */
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem {
+  position: relative;
+}
+
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist .main-yourLibraryX-listItem:not(:has([data-encore-id="card"])) {
+  padding-inline-start: 22px !important;
+}
+
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist .main-yourLibraryX-listItem:not(:has([data-encore-id="card"]))::before,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist .main-yourLibraryX-listItem:not(:has([data-encore-id="card"]))::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  background: var(--term-subdued);
+  opacity: 0.45;
+  pointer-events: none;
+  z-index: 1;
+  transition: opacity var(--tf-fast) var(--tf-ease);
+}
+
+/* ├ vertical */
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist .main-yourLibraryX-listItem:not(:has([data-encore-id="card"]))::before {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+
+/* ─ horizontal */
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist .main-yourLibraryX-listItem:not(:has([data-encore-id="card"]))::after {
+  top: 50%;
+  width: 14px;
+  height: 1px;
+}
+
+/* └ on the last row */
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist .main-yourLibraryX-listItem:last-child.main-yourLibraryX-listItem:not(:has([data-encore-id="card"]))::before,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist [role="row"]:last-child > .main-yourLibraryX-listItem:not(:has([data-encore-id="card"]))::before,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist [role="row"]:last-child .main-yourLibraryX-listItem:not(:has([data-encore-id="card"]))::before {
+  bottom: 50%;
+}
+
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist .main-yourLibraryX-listItem:not(:has([data-encore-id="card"])):hover::after,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist .main-yourLibraryX-listItem:not(:has([data-encore-id="card"])):focus-within::after {
+  background: var(--term-green);
+  opacity: 1;
+}
+
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem [data-encore-id="listRow"],
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem .main-yourLibraryX-listItemGroup {
+  border-radius: 0 !important;
+  padding-block: 4px !important;
+  transition: background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem [data-encore-id="listRow"]:hover,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem .main-yourLibraryX-listItemGroup:hover {
+  background-color: var(--term-bg-hi) !important;
+}
+
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem [aria-selected="true"],
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem [aria-current="page"],
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem [data-context-menu-open="true"] {
+  background-color: var(--term-bg-hi) !important;
+  box-shadow: inset 2px 0 0 var(--term-green) !important;
+}
+
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listRowTitleLink,
+html.terminal-full .Root__nav-bar [data-encore-id="listRowTitle"] {
+  font-size: 13px !important;
+  font-weight: 400 !important;
+}
+
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem:hover .main-yourLibraryX-listRowTitleLink,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem:hover [data-encore-id="listRowTitle"] {
+  color: var(--term-green) !important;
+}
+
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listRowSubtitle,
+html.terminal-full .Root__nav-bar [data-encore-id="listRowSubtitle"] {
+  font-size: 11px !important;
+  color: var(--term-subdued) !important;
+}
+
+/* Pinned / downloaded / playing markers: accent, square, small. */
+html.terminal-full .Root__nav-bar :is(.main-yourLibraryX-listRowSubtitle, [data-encore-id="listRowSubtitle"], .main-rootlist-statusIcons) svg {
+  fill: var(--term-green) !important;
+  color: var(--term-green) !important;
+}
+
+/* Covers: square, framed, a size down (list mode). */
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist .main-yourLibraryX-listItem:not(:has([data-encore-id="card"])) .main-yourLibraryX-rowCover,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist .main-yourLibraryX-listItem:not(:has([data-encore-id="card"])) .main-yourLibraryX-listRowEntityImage {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+}
+
+html.terminal-full .Root__nav-bar .main-yourLibraryX-rowCover,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listRowEntityImage,
+html.terminal-full .Root__nav-bar .x-entityImage-imageContainer {
+  outline: 1px solid var(--term-border);
+  outline-offset: -1px;
+}
+
+/* Collapsed rail: no tree, centered framed tiles. */
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryIsCollapsed .main-yourLibraryX-listItem {
+  padding-inline-start: 0 !important;
+}
+
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryIsCollapsed .main-yourLibraryX-listItem::before,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryIsCollapsed .main-yourLibraryX-listItem::after {
+  content: none !important;
+}
+
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryIsCollapsed .main-yourLibraryX-rowCover,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryIsCollapsed .main-yourLibraryX-listRowEntityImage {
+  width: 40px !important;
+  height: 40px !important;
+}
+
+/* Grid mode: framed square cards. */
+html.terminal-full .Root__nav-bar [data-encore-id="card"] {
+  border: 1px solid var(--term-border) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transition: border-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__nav-bar [data-encore-id="card"]:hover {
+  border-color: var(--term-green) !important;
+}
+
+/* ---------- 4. Reduced motion: none of the above moves ---------------- */
+@media (prefers-reduced-motion: reduce) {
+  html.terminal-full .Root__globalNav,
+html.terminal-full .Root__nav-bar,
+html.terminal-full .Root__main-view,
+html.terminal-full .Root__right-sidebar,
+html.terminal-full .Root__nav-bar::before,
+html.terminal-full .Root__main-view::before,
+html.terminal-full .Root__right-sidebar::before,
+html.terminal-full .main-globalNav-searchInputContainer::after {
+    animation: none !important;
+  }
+}
+/* Pane titles now come from theme.js (#tf-pane-titles, positioned from the
+   panes' measured rects) — the old ::before labels had to guess where
+   their static position would land in Spotify's real markup and could end
+   up over pane content. Neutralised here, after every rule that set them. */
+html.terminal-full .Root__nav-bar::before,
+html.terminal-full .Root__main-view::before,
+html.terminal-full .Root__right-sidebar::before,
+html.terminal-full .Root__nav-bar:has(.main-yourLibraryX-libraryIsCollapsed)::before,
+html.terminal-full .Root__right-sidebar:has(aside:not(:empty))::before {
+  content: none !important;
+}
+
+#tf-pane-titles {
+  position: fixed;
+  inset: 0 auto auto 0;
+  width: 0;
+  height: 0;
+  /* Above Spotify's panes (the real client stacks them higher than our
+     first guess of 60, which hid the titles), below menus/modals/badges. */
+  z-index: 9000;
+  pointer-events: none;
+}
+
+html:not(.terminal-full) #tf-pane-titles {
+  display: none;
+}
+
+.tf-pane-title {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: calc(var(--tf-title-h, 22px) - 6px);
+  line-height: calc(var(--tf-title-h, 22px) - 6px);
+  padding: 0 6px;
+  font-family: var(--term-font);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--term-subdued);
+  background: var(--term-bg-tinted, #1a1c22);
+  box-sizing: border-box;
+  transition: color var(--tf-fast, 120ms) ease, background-color var(--tf-fast, 120ms) ease;
+}
+
+.tf-pane-title.is-active {
+  color: var(--term-bg);
+  background: var(--term-green);
+}
+
+/* Spotify's own search placeholder stays: overlaying our own text on top
+   of it drew two strings in the same spot whenever the native one showed. */
+/* --- END FULL/SHELL ------------------------------------------------------ */
+
+/* --- FULL/PLAYER (agent B) ----------------------------------------------- */
+/* The playbar becomes a tmux-style status line: a mode tag and the
+   now-playing widget on the left, the transport and a text-style seek bar
+   in the middle, and glyph buttons with short visible labels on the right.
+   The right sidebar panes (now playing view, queue, friend activity,
+   Connect devices), the fullscreen view and the lyrics view are restyled
+   to match.
+   Nothing is replaced. Every control is still Spotify's own button or
+   slider, so clicks, drags, keyboard focus and aria-labels behave as they
+   do natively; the glyphs are ::before/::after text and the native SVG is
+   only hidden.
+   Play/pause, shuffle, repeat and mute states are read from Spotify's own
+   attributes (aria-checked, data-active, .control-button--active). When a
+   build doesn't expose them, from Spicetify.Player via the
+   data-tf-playback / data-tf-shuffle / data-tf-repeat / data-tf-muted
+   attributes that theme.js (FULL/PLAYER) keeps on <html>. Glyph content is
+   passed through --tfp-glyph / --tfp-label so each button is one short
+   rule. */
+
+/* ---------- 1. Status line frame ---------------------------------------- */
+html.terminal-full .Root__now-playing-bar {
+  border-top: 1px solid var(--term-border);
+  background-color: var(--term-bg-tinted) !important;
+}
+
+/* The v1.2 pulse was a 3px gradient bar. Here it becomes a 1px line along
+   the status line's top edge, tinted with the track color. It only
+   breathes in opacity, so the bar's top gets a hint of the track's color
+   without the whole bar being flooded with it. */
+html.terminal-full .Root__now-playing-bar::before {
+  inset: -1px 0 auto 0;
+  height: 1px;
+  background: var(--track-accent, var(--term-green));
+  animation: tfp-breathe var(--track-bpm-ms, 2400ms) ease-in-out infinite;
+}
+
+@keyframes tfp-breathe {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.9; }
+}
+
+html.terminal-full .Root__now-playing-bar * {
+  border-radius: 0 !important;
+}
+
+html.terminal-full .main-nowPlayingBar-nowPlayingBar,
+html.terminal-full .main-nowPlayingBar-container {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html.terminal-full .main-nowPlayingBar-nowPlayingBar {
+  padding-left: 0 !important;
+}
+
+/* Segments are separated by 1px rules, the way tmux separates status
+   fields. */
+html.terminal-full .main-nowPlayingBar-left {
+  position: relative;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding-left: 84px !important;
+  padding-right: 12px;
+  border-right: 1px solid var(--term-border);
+  min-width: 0;
+}
+
+html.terminal-full .main-nowPlayingBar-right {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding-left: 12px;
+  border-left: 1px solid var(--term-border);
+}
+
+/* Mode tag, like vim's "-- INSERT --" or tmux's session block: says at a
+   glance whether music is playing. It is decorative only
+   (pseudo-element, no pointer events), and the real play button stays in
+   the center. */
+html.terminal-full .main-nowPlayingBar-left::before {
+  content: "idle";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--term-subdued);
+  background: var(--term-bg-elevated);
+  border-right: 1px solid var(--term-border);
+  pointer-events: none;
+  transition: background-color var(--tf-med) var(--tf-ease), color var(--tf-med) var(--tf-ease);
+}
+
+html.terminal-full [data-tf-playback="playing"] .main-nowPlayingBar-left::before {
+  content: "▶\FE0E  play";
+  color: var(--term-bg);
+  background: var(--term-green);
+}
+
+html.terminal-full [data-tf-playback="paused"] .main-nowPlayingBar-left::before {
+  content: "❚❚ pause";
+  color: var(--term-text);
+}
+
+/* ---------- 1a. Now-playing widget (left segment) ----------------------- */
+html.terminal-full [data-testid="now-playing-widget"] {
+  gap: 10px;
+  min-width: 0;
+}
+
+/* Small square cover with a 1px frame. The ASCII canvas theme.js draws in
+   .main-nowPlayingWidget-coverArtContainer is absolutely positioned at
+   inset 0, so it follows whatever size the container ends up with. */
+html.terminal-full .main-nowPlayingWidget-coverArt {
+  flex: 0 0 auto;
+  outline: 1px solid var(--term-border);
+  outline-offset: 2px;
+  transition: outline-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .main-nowPlayingWidget-coverArt:hover {
+  outline-color: var(--term-green);
+}
+
+html.terminal-full .main-nowPlayingWidget-coverArt :is(.main-nowPlayingWidget-coverArtContainer, .cover-art, [data-testid="cover-art-button"], img) {
+  width: 44px !important;
+  height: 44px !important;
+  box-shadow: none !important;
+}
+
+/* The pulse's cover glow (a big blurred radial bloom in v1.2) becomes a
+   hairline frame in the track color, pulsing in opacity only. */
+html.terminal-full .main-nowPlayingWidget-coverArt::after {
+  inset: 0;
+  background: none;
+  filter: none;
+  border: 1px solid var(--track-accent, var(--term-green));
+  z-index: 3;
+  animation: tfp-breathe var(--track-bpm-ms, 2400ms) ease-in-out infinite;
+}
+
+html.terminal-full .main-nowPlayingWidget-trackInfo {
+  min-width: 0;
+}
+
+html.terminal-full .main-nowPlayingWidget-trackInfo .main-trackInfo-name {
+  font-size: 13px !important;
+  font-weight: 700;
+}
+
+html.terminal-full .main-nowPlayingWidget-trackInfo .main-trackInfo-name a::before {
+  content: "♪ ";
+  color: var(--term-green);
+}
+
+html.terminal-full .main-nowPlayingWidget-trackInfo .main-trackInfo-artists {
+  display: flex !important;
+  align-items: baseline;
+  min-width: 0;
+  font-size: 12px !important;
+}
+
+html.terminal-full .main-nowPlayingWidget-trackInfo .main-trackInfo-artists::before {
+  content: "— ";
+  flex: 0 0 auto;
+  white-space: pre;
+  color: var(--term-subdued);
+}
+
+html.terminal-full .main-nowPlayingWidget-trackInfo .main-trackInfo-artists > * {
+  min-width: 0;
+}
+
+html.terminal-full .main-nowPlayingWidget-trackInfo a {
+  transition: color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .main-nowPlayingWidget-trackInfo a:hover {
+  color: var(--term-green) !important;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Like / add-to-library: ＋ when not saved, ♥ in green when saved. Spotify
+   exposes the saved state as aria-checked on this button in every build
+   seen so far. */
+html.terminal-full [data-testid="now-playing-widget"] button:is([aria-checked], .main-addButton-button, .control-button-heart),
+html.terminal-full .main-nowPlayingWidget-plusButton button {
+  --tfp-glyph: "＋";
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  color: var(--term-subdued) !important;
+  font-size: 15px;
+  transform: none !important;
+  transition: color var(--tf-fast) var(--tf-ease), border-color var(--tf-fast) var(--tf-ease), background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full [data-testid="now-playing-widget"] button:is([aria-checked], .main-addButton-button, .control-button-heart) svg,
+html.terminal-full .main-nowPlayingWidget-plusButton button svg {
+  display: none !important;
+}
+
+html.terminal-full [data-testid="now-playing-widget"] button:is([aria-checked], .main-addButton-button, .control-button-heart)::before,
+html.terminal-full .main-nowPlayingWidget-plusButton button::before {
+  content: var(--tfp-glyph);
+  line-height: 1;
+}
+
+html.terminal-full [data-testid="now-playing-widget"] button:is([aria-checked="true"], .main-addButton-active),
+html.terminal-full .main-nowPlayingWidget-plusButton button:is([aria-checked="true"], .main-addButton-active) {
+  --tfp-glyph: "♥\FE0E";
+  color: var(--term-green) !important;
+}
+
+html.terminal-full [data-testid="now-playing-widget"] button:is([aria-checked], .main-addButton-button, .control-button-heart):hover,
+html.terminal-full .main-nowPlayingWidget-plusButton button:hover {
+  color: var(--term-text) !important;
+  border-color: var(--term-border) !important;
+  background-color: var(--term-bg-hi) !important;
+}
+
+/* ---------- 1b. Transport (center segment) ------------------------------
+   Selectors are Spotify's own data-testids, not scoped to the playbar, so
+   the same look carries into the fullscreen view (.npv-nowPlayingBar-*)
+   automatically. */
+html.terminal-full .player-controls__buttons {
+  gap: 6px !important;
+  margin-bottom: 4px;
+}
+
+html.terminal-full .player-controls__left,
+html.terminal-full .player-controls__right {
+  gap: 4px !important;
+}
+
+html.terminal-full [data-testid="control-button-shuffle"],
+html.terminal-full [data-testid="control-button-skip-back"],
+html.terminal-full [data-testid="control-button-skip-forward"],
+html.terminal-full [data-testid="control-button-repeat"],
+html.terminal-full [data-testid="control-button-seek-back-15"],
+html.terminal-full [data-testid="control-button-seek-forward-15"],
+html.terminal-full [data-testid="control-button-sleep-timer"],
+html.terminal-full [data-testid="control-button-npv-episodes"] {
+  position: relative;
+  min-width: 32px !important;
+  width: auto !important;
+  height: 32px !important;
+  padding: 0 6px !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  color: var(--term-subdued) !important;
+  font-size: 16px;
+  line-height: 1;
+  white-space: nowrap;
+  transform: none !important;
+  transition: color var(--tf-fast) var(--tf-ease), background-color var(--tf-fast) var(--tf-ease), border-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full [data-testid="control-button-shuffle"] { --tfp-glyph: "⤮"; }
+html.terminal-full [data-testid="control-button-skip-back"] { --tfp-glyph: "⏮\FE0E"; }
+html.terminal-full [data-testid="control-button-skip-forward"] { --tfp-glyph: "⏭\FE0E"; }
+html.terminal-full [data-testid="control-button-repeat"] { --tfp-glyph: "↻"; }
+html.terminal-full [data-testid="control-button-seek-back-15"] { --tfp-glyph: "-15s"; }
+html.terminal-full [data-testid="control-button-seek-forward-15"] { --tfp-glyph: "+15s"; }
+html.terminal-full [data-testid="control-button-sleep-timer"] { --tfp-glyph: "zZ"; }
+html.terminal-full [data-testid="control-button-npv-episodes"] { --tfp-glyph: "≡"; }
+
+html.terminal-full [data-testid="control-button-repeat"]:is([aria-checked="mixed"]),
+html.terminal-full [data-tf-repeat="2"] [data-testid="control-button-repeat"] {
+  --tfp-glyph: "↻¹";
+}
+
+html.terminal-full :is(
+  [data-testid="control-button-shuffle"],
+  [data-testid="control-button-skip-back"],
+  [data-testid="control-button-skip-forward"],
+  [data-testid="control-button-repeat"],
+  [data-testid="control-button-seek-back-15"],
+  [data-testid="control-button-seek-forward-15"],
+  [data-testid="control-button-sleep-timer"],
+  [data-testid="control-button-npv-episodes"]
+) svg {
+  display: none !important;
+}
+
+html.terminal-full [data-testid="control-button-shuffle"]::before,
+html.terminal-full [data-testid="control-button-skip-back"]::before,
+html.terminal-full [data-testid="control-button-skip-forward"]::before,
+html.terminal-full [data-testid="control-button-repeat"]::before,
+html.terminal-full [data-testid="control-button-seek-back-15"]::before,
+html.terminal-full [data-testid="control-button-seek-forward-15"]::before,
+html.terminal-full [data-testid="control-button-sleep-timer"]::before,
+html.terminal-full [data-testid="control-button-npv-episodes"]::before {
+  content: var(--tfp-glyph);
+  position: static;
+  font-size: inherit;
+  line-height: 1;
+}
+
+/* ::after is Spotify's green "active" dot on these buttons. It is taken
+   over for the hover underline sweep, and active state is shown as inverse
+   video instead of the dot. */
+html.terminal-full [data-testid="control-button-shuffle"]::after,
+html.terminal-full [data-testid="control-button-skip-back"]::after,
+html.terminal-full [data-testid="control-button-skip-forward"]::after,
+html.terminal-full [data-testid="control-button-repeat"]::after,
+html.terminal-full [data-testid="control-button-seek-back-15"]::after,
+html.terminal-full [data-testid="control-button-seek-forward-15"]::after,
+html.terminal-full [data-testid="control-button-sleep-timer"]::after,
+html.terminal-full [data-testid="control-button-npv-episodes"]::after {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  inset: auto 5px 4px 5px !important;
+  width: auto !important;
+  height: 1px !important;
+  background: var(--term-green) !important;
+  opacity: 1 !important;
+  border-radius: 0 !important;
+  transform: scaleX(0) !important;
+  transform-origin: left center;
+  transition: transform var(--tf-med) var(--tf-ease);
+}
+
+html.terminal-full [data-testid="control-button-shuffle"]:is(:hover, :focus-visible),
+html.terminal-full [data-testid="control-button-skip-back"]:is(:hover, :focus-visible),
+html.terminal-full [data-testid="control-button-skip-forward"]:is(:hover, :focus-visible),
+html.terminal-full [data-testid="control-button-repeat"]:is(:hover, :focus-visible),
+html.terminal-full [data-testid="control-button-seek-back-15"]:is(:hover, :focus-visible),
+html.terminal-full [data-testid="control-button-seek-forward-15"]:is(:hover, :focus-visible),
+html.terminal-full [data-testid="control-button-sleep-timer"]:is(:hover, :focus-visible),
+html.terminal-full [data-testid="control-button-npv-episodes"]:is(:hover, :focus-visible) {
+  color: var(--term-text) !important;
+  background-color: var(--term-bg-hi) !important;
+}
+
+html.terminal-full [data-testid="control-button-shuffle"]:is(:hover, :focus-visible)::after,
+html.terminal-full [data-testid="control-button-skip-back"]:is(:hover, :focus-visible)::after,
+html.terminal-full [data-testid="control-button-skip-forward"]:is(:hover, :focus-visible)::after,
+html.terminal-full [data-testid="control-button-repeat"]:is(:hover, :focus-visible)::after,
+html.terminal-full [data-testid="control-button-seek-back-15"]:is(:hover, :focus-visible)::after,
+html.terminal-full [data-testid="control-button-seek-forward-15"]:is(:hover, :focus-visible)::after,
+html.terminal-full [data-testid="control-button-sleep-timer"]:is(:hover, :focus-visible)::after,
+html.terminal-full [data-testid="control-button-npv-episodes"]:is(:hover, :focus-visible)::after {
+  transform: scaleX(1) !important;
+}
+
+html.terminal-full [data-testid="control-button-shuffle"]:active,
+html.terminal-full [data-testid="control-button-skip-back"]:active,
+html.terminal-full [data-testid="control-button-skip-forward"]:active,
+html.terminal-full [data-testid="control-button-repeat"]:active {
+  transform: translateY(1px) !important;
+}
+
+/* Active shuffle / repeat: inverse video (green block, dark glyph), the
+   way a terminal shows a selected item. */
+html.terminal-full [data-testid="control-button-shuffle"]:is([aria-checked="true"], [aria-checked="mixed"], .control-button--active, .main-shuffleButton-active, .main-repeatButton-active),
+html.terminal-full [data-testid="control-button-repeat"]:is([aria-checked="true"], [aria-checked="mixed"], .control-button--active, .main-shuffleButton-active, .main-repeatButton-active),
+html.terminal-full [data-tf-shuffle="1"] [data-testid="control-button-shuffle"],
+html.terminal-full:is([data-tf-repeat="1"], [data-tf-repeat="2"]) [data-testid="control-button-repeat"] {
+  color: var(--term-bg) !important;
+  background-color: var(--term-green) !important;
+  border-color: var(--term-green) !important;
+}
+
+html.terminal-full [data-testid="control-button-shuffle"]:is([aria-checked="true"], [aria-checked="mixed"], .control-button--active, .main-shuffleButton-active, .main-repeatButton-active)::after,
+html.terminal-full [data-testid="control-button-repeat"]:is([aria-checked="true"], [aria-checked="mixed"], .control-button--active, .main-shuffleButton-active, .main-repeatButton-active)::after,
+html.terminal-full [data-tf-shuffle="1"] [data-testid="control-button-shuffle"]::after,
+html.terminal-full:is([data-tf-repeat="1"], [data-tf-repeat="2"]) [data-testid="control-button-repeat"]::after {
+  background: var(--term-bg) !important;
+}
+
+html.terminal-full :is([data-testid^="control-button-"])[disabled],
+html.terminal-full :is([data-testid^="control-button-"])[aria-disabled="true"] {
+  opacity: 0.35;
+}
+
+/* Play/pause: no more white circle. A bracketed text button, [ ▶ ] or
+   [ ❚❚ ], outlined in green and inverse on hover. The glyph comes from
+   data-tf-playback (set by theme.js). Without it the native SVG stays
+   visible between the brackets, so the button never ends up blank. */
+html.terminal-full [data-testid="control-button-playpause"] {
+  position: relative;
+  width: auto !important;
+  min-width: 68px !important;
+  height: 32px !important;
+  min-height: 32px;
+  margin: 0 6px;
+  padding: 0 8px !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: transparent !important;
+  border: 1px solid var(--term-green) !important;
+  color: var(--term-green) !important;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: none !important;
+  transform: none !important;
+  transition: color var(--tf-fast) var(--tf-ease), background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full [data-testid="control-button-playpause"]::before { content: "["; }
+html.terminal-full [data-testid="control-button-playpause"]::after { content: "]"; }
+
+html.terminal-full [data-testid="control-button-playpause"] > span {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  min-width: 3ch;
+  width: auto !important;
+  height: auto !important;
+  padding: 0 !important;
+  background: transparent !important;
+  color: inherit !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+html.terminal-full [data-testid="control-button-playpause"] svg {
+  fill: currentColor;
+  color: inherit !important;
+}
+
+html.terminal-full [data-tf-playback] [data-testid="control-button-playpause"] > span > * {
+  display: none !important;
+}
+
+html.terminal-full [data-tf-playback] [data-testid="control-button-playpause"] > span::before {
+  content: "▶\FE0E";
+}
+
+html.terminal-full [data-tf-playback="playing"] [data-testid="control-button-playpause"] > span::before {
+  content: "❚❚";
+  letter-spacing: -0.1em;
+}
+
+html.terminal-full [data-testid="control-button-playpause"]:is(:hover, :focus-visible) {
+  color: var(--term-bg) !important;
+  background-color: var(--term-green) !important;
+}
+
+html.terminal-full [data-testid="control-button-playpause"]:active {
+  transform: translateY(1px) !important;
+}
+
+/* ---------- 1c. Seek bar: [██████░░░░░░] 1:23/3:45 ----------------------
+   The native slider stays the draggable element (with its hidden
+   <input type=range> for the keyboard). Only the look changes: the track
+   is cut into blocks by a mask, the filled part is green and the empty
+   part is a dim block. Both time labels move to the right of the bar with
+   CSS `order`, which reorders the rendering without moving any node.
+   theme.js's tempo markers (.terminal-tempo-markers, appended to
+   [data-testid="progress-bar"]) become ruler ticks just above the blocks. */
+html.terminal-full .playback-bar {
+  gap: 0 !important;
+  font-size: 11px;
+}
+
+html.terminal-full .playback-bar .playback-bar__progress-time-elapsed,
+html.terminal-full .playback-bar [data-testid="playback-position"] {
+  order: 2;
+  min-width: 0 !important;
+  margin-left: 18px;
+  text-align: right;
+  color: var(--term-text) !important;
+  font-size: 11px !important;
+  font-variant-numeric: tabular-nums;
+}
+
+html.terminal-full .playback-bar .main-playbackBarRemainingTime-container,
+html.terminal-full .playback-bar [data-testid="playback-duration"] {
+  order: 3;
+  min-width: 0 !important;
+  text-align: left;
+  color: var(--term-subdued) !important;
+  font-size: 11px !important;
+  font-variant-numeric: tabular-nums;
+}
+
+html.terminal-full .playback-bar .main-playbackBarRemainingTime-container::before,
+html.terminal-full .playback-bar [data-testid="playback-duration"]::before {
+  content: "/";
+  color: var(--term-subdued);
+  margin: 0 2px;
+}
+
+html.terminal-full .playback-bar [data-testid="progress-bar"] {
+  --progress-bar-height: 10px !important;
+  --progress-bar-radius: 0 !important;
+  margin: 0 12px;
+  overflow: visible !important;
+}
+
+html.terminal-full .playback-bar [data-testid="progress-bar"]::before,
+html.terminal-full .playback-bar [data-testid="progress-bar"]::after {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  line-height: 1;
+  color: var(--term-subdued);
+  pointer-events: none;
+}
+
+html.terminal-full .playback-bar [data-testid="progress-bar"]::before { content: "["; left: -11px; }
+html.terminal-full .playback-bar [data-testid="progress-bar"]::after { content: "]"; right: -11px; }
+
+html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) [data-testid="progress-bar-background"],
+html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) .x-progressBar-progressBarBg,
+html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) .x-progressBar-background {
+  height: 10px !important;
+  border-radius: 0 !important;
+  background-color: var(--term-border) !important;
+  -webkit-mask-image: repeating-linear-gradient(90deg, var(--term-bg) 0 6px, transparent 6px 8px);
+  mask-image: repeating-linear-gradient(90deg, var(--term-bg) 0 6px, transparent 6px 8px);
+  transition: background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) .x-progressBar-fillColor,
+html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) .x-progressBar-foreground,
+html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) .x-progressBar-progressFillColor {
+  background-color: var(--term-green) !important;
+  border-radius: 0 !important;
+}
+
+html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) [data-testid="progress-bar"]:hover [data-testid="progress-bar-background"],
+html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) [data-testid="progress-bar"]:hover .x-progressBar-progressBarBg,
+html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) [data-testid="progress-bar"]:hover .x-progressBar-background {
+  background-color: var(--term-subdued) !important;
+}
+
+/* Handle: a thin block cursor instead of the v1.2 10px square. */
+html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) [data-testid="progress-bar-handle"] {
+  width: 4px !important;
+  height: 16px !important;
+  background-color: var(--term-text) !important;
+  box-shadow: 0 0 0 1px var(--term-bg) !important;
+}
+
+html.terminal-full .playback-bar .terminal-tempo-tick {
+  top: -5px;
+  bottom: auto;
+  height: 3px;
+  width: 1px;
+  background: var(--term-subdued);
+  opacity: 0.7;
+}
+
+/* ---------- 1d. Right segment: labelled glyph buttons ------------------ */
+html.terminal-full .main-nowPlayingBar-extraControls {
+  gap: 2px !important;
+}
+
+/* Any button there (including ones added by extensions) gets the same
+   square frame and hover. Known ones also swap their icon for a glyph and
+   a short label below it (see next rules). */
+html.terminal-full .main-nowPlayingBar-extraControls button {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  color: var(--term-subdued) !important;
+  transform: none !important;
+  transition: color var(--tf-fast) var(--tf-ease), background-color var(--tf-fast) var(--tf-ease), border-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .main-nowPlayingBar-extraControls button:is(:hover, :focus-visible) {
+  color: var(--term-text) !important;
+  background-color: var(--term-bg-hi) !important;
+  border-color: var(--term-border) !important;
+}
+
+html.terminal-full [data-testid="control-button-npv"] { --tfp-glyph: "▣"; --tfp-label: "now"; }
+html.terminal-full [data-testid="lyrics-button"] { --tfp-glyph: "¶"; --tfp-label: "lyrics"; }
+html.terminal-full [data-testid="control-button-queue"] { --tfp-glyph: "≡"; --tfp-label: "queue"; }
+html.terminal-full .main-nowPlayingBar-extraControls .main-devicePicker-controlButton:not(tf-nx),
+html.terminal-full .main-nowPlayingBar-extraControls button[aria-describedby*="connect"] { --tfp-glyph: "⇆"; --tfp-label: "device"; }
+html.terminal-full [data-testid="pip-toggle-button"] { --tfp-glyph: "⧉"; --tfp-label: "mini"; }
+html.terminal-full [data-testid="fullscreen-mode-button"] { --tfp-glyph: "⤢"; --tfp-label: "full"; }
+
+html.terminal-full [data-testid="control-button-npv"],
+html.terminal-full [data-testid="lyrics-button"],
+html.terminal-full [data-testid="control-button-queue"],
+html.terminal-full [data-testid="pip-toggle-button"],
+html.terminal-full [data-testid="fullscreen-mode-button"],
+html.terminal-full .main-nowPlayingBar-extraControls .main-devicePicker-controlButton:not(tf-nx),
+html.terminal-full .main-nowPlayingBar-extraControls button[aria-describedby*="connect"] {
+  position: relative;
+  width: auto !important;
+  min-width: 40px !important;
+  height: 40px !important;
+  padding: 3px 4px !important;
+  display: inline-flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  line-height: 1;
+}
+
+html.terminal-full :is(
+  [data-testid="control-button-npv"],
+  [data-testid="lyrics-button"],
+  [data-testid="control-button-queue"],
+  [data-testid="pip-toggle-button"],
+  [data-testid="fullscreen-mode-button"]
+) svg,
+html.terminal-full .main-nowPlayingBar-extraControls :is(.main-devicePicker-controlButton, button[aria-describedby*="connect"]) svg {
+  display: none !important;
+}
+
+html.terminal-full [data-testid="control-button-npv"]::before,
+html.terminal-full [data-testid="lyrics-button"]::before,
+html.terminal-full [data-testid="control-button-queue"]::before,
+html.terminal-full [data-testid="pip-toggle-button"]::before,
+html.terminal-full [data-testid="fullscreen-mode-button"]::before,
+html.terminal-full .main-nowPlayingBar-extraControls .main-devicePicker-controlButton:not(tf-nx)::before,
+html.terminal-full .main-nowPlayingBar-extraControls button[aria-describedby*="connect"]::before {
+  content: var(--tfp-glyph);
+  position: static;
+  font-size: 15px;
+  line-height: 16px;
+}
+
+/* ::after is the label, which also takes over Spotify's active dot. */
+html.terminal-full [data-testid="control-button-npv"]::after,
+html.terminal-full [data-testid="lyrics-button"]::after,
+html.terminal-full [data-testid="control-button-queue"]::after,
+html.terminal-full [data-testid="pip-toggle-button"]::after,
+html.terminal-full [data-testid="fullscreen-mode-button"]::after,
+html.terminal-full .main-nowPlayingBar-extraControls .main-devicePicker-controlButton:not(tf-nx)::after,
+html.terminal-full .main-nowPlayingBar-extraControls button[aria-describedby*="connect"]::after {
+  content: var(--tfp-label) !important;
+  display: block !important;
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  background: none !important;
+  transform: none !important;
+  opacity: 1 !important;
+  font-size: 9px;
+  line-height: 10px;
+  letter-spacing: 0.02em;
+  color: inherit;
+}
+
+/* Open panel / active view: inverse video instead of the green dot. */
+html.terminal-full [data-testid="control-button-npv"]:is([data-active="true"], [aria-pressed="true"], .control-button--active),
+html.terminal-full [data-testid="lyrics-button"]:is([data-active="true"], [aria-pressed="true"], .control-button--active),
+html.terminal-full [data-testid="control-button-queue"]:is([data-active="true"], [aria-pressed="true"], .control-button--active),
+html.terminal-full [data-testid="pip-toggle-button"]:is([data-active="true"], [aria-pressed="true"], .control-button--active),
+html.terminal-full [data-testid="fullscreen-mode-button"]:is([data-active="true"], [aria-pressed="true"], .control-button--active),
+html.terminal-full .main-nowPlayingBar-extraControls .main-devicePicker-controlButton:not(tf-nx):is([data-active="true"], [aria-pressed="true"], [aria-expanded="true"], .control-button--active, .main-devicePicker-connected),
+html.terminal-full .main-nowPlayingBar-extraControls button[aria-describedby*="connect"]:is([data-active="true"], [aria-pressed="true"], [aria-expanded="true"], .control-button--active, .main-devicePicker-connected) {
+  color: var(--term-bg) !important;
+  background-color: var(--term-green) !important;
+  border-color: var(--term-green) !important;
+}
+
+/* Volume: "vol" text on the mute toggle plus the same blocks as the seek
+   bar (▮▮▮▯▯), still the native draggable slider. */
+html.terminal-full [data-testid="volume-bar"] {
+  gap: 4px;
+  align-items: center;
+}
+
+html.terminal-full [data-testid="volume-bar-toggle-mute-button"] {
+  width: auto !important;
+  min-width: 40px !important;
+  height: 32px !important;
+  padding: 0 4px !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  color: var(--term-subdued) !important;
+  font-size: 11px;
+  transform: none !important;
+  transition: color var(--tf-fast) var(--tf-ease), border-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full [data-testid="volume-bar-toggle-mute-button"] svg {
+  display: none !important;
+}
+
+html.terminal-full [data-testid="volume-bar-toggle-mute-button"]::before {
+  content: "vol";
+}
+
+html.terminal-full [data-tf-muted="1"] [data-testid="volume-bar-toggle-mute-button"]::before {
+  content: "mute";
+  text-decoration: line-through;
+}
+
+html.terminal-full [data-testid="volume-bar-toggle-mute-button"]:is(:hover, :focus-visible) {
+  color: var(--term-text) !important;
+  border-color: var(--term-border) !important;
+}
+
+html.terminal-full [data-testid="volume-bar"] [data-testid="progress-bar-background"],
+html.terminal-full [data-testid="volume-bar"] .x-progressBar-progressBarBg,
+html.terminal-full [data-testid="volume-bar"] .x-progressBar-background {
+  -webkit-mask-image: repeating-linear-gradient(90deg, var(--term-bg) 0 8px, transparent 8px 11px);
+  mask-image: repeating-linear-gradient(90deg, var(--term-bg) 0 8px, transparent 8px 11px);
+}
+
+html.terminal-full [data-testid="volume-bar"] [data-testid="progress-bar"] {
+  --progress-bar-height: 10px !important;
+  --progress-bar-radius: 0 !important;
+}
+
+/* The green "Listening on <device>" strip under the bar. */
+html.terminal-full .main-connectBar-connectBar {
+  background: var(--term-bg-elevated) !important;
+  color: var(--term-green) !important;
+  border-top: 1px solid var(--term-border);
+  font-size: 11px;
+}
+
+html.terminal-full .main-connectBar-connectBar svg,
+html.terminal-full .main-connectBar-connectBar path {
+  fill: var(--term-green) !important;
+  color: var(--term-green) !important;
+}
+
+html.terminal-full .main-connectBar-connectBar::before {
+  content: "⇆ ";
+  margin-right: 4px;
+}
+
+/* Narrow windows: drop the text labels and the mode tag. The buttons keep
+   their glyph and Spotify's own tooltip, so they stay identifiable. */
+@media (max-width: 1100px) {
+  html.terminal-full [data-testid="control-button-npv"]::after,
+html.terminal-full [data-testid="lyrics-button"]::after,
+html.terminal-full [data-testid="control-button-queue"]::after,
+html.terminal-full [data-testid="pip-toggle-button"]::after,
+html.terminal-full [data-testid="fullscreen-mode-button"]::after,
+html.terminal-full .main-nowPlayingBar-extraControls .main-devicePicker-controlButton:not(tf-nx)::after,
+html.terminal-full .main-nowPlayingBar-extraControls button[aria-describedby*="connect"]::after {
+    display: none !important;
+  }
+
+  html.terminal-full [data-testid="control-button-npv"],
+html.terminal-full [data-testid="lyrics-button"],
+html.terminal-full [data-testid="control-button-queue"],
+html.terminal-full [data-testid="pip-toggle-button"],
+html.terminal-full [data-testid="fullscreen-mode-button"],
+html.terminal-full .main-nowPlayingBar-extraControls .main-devicePicker-controlButton:not(tf-nx),
+html.terminal-full .main-nowPlayingBar-extraControls button[aria-describedby*="connect"] {
+    min-width: 32px !important;
+    height: 32px !important;
+  }
+
+  html.terminal-full [data-testid="volume-bar-toggle-mute-button"] {
+    min-width: 32px !important;
+  }
+
+  html.terminal-full [data-testid="volume-bar"] {
+    width: auto !important;
+  }
+
+  html.terminal-full [data-testid="volume-bar"] > :not(button) {
+    width: 56px !important;
+    flex: 0 0 56px !important;
+  }
+
+  html.terminal-full .main-nowPlayingBar-right {
+    padding-left: 6px;
+  }
+
+  html.terminal-full .playback-bar .playback-bar__progress-time-elapsed,
+html.terminal-full .playback-bar [data-testid="playback-position"] {
+    margin-left: 14px;
+  }
+
+  html.terminal-full .main-nowPlayingBar-left {
+    padding-left: 12px !important;
+  }
+
+  html.terminal-full .main-nowPlayingBar-left::before {
+    display: none;
+  }
+}
+
+/* ---------- 2. Right sidebar: terminal panes ---------------------------
+   Now Playing view, queue, friend activity and Connect devices all live
+   in aside#Desktop_PanelContainer_Id. Headings get a "# " prefix, lists
+   become ls-style rows, and cards are square boxes with 1px borders. Merch
+   is hidden, and so are Premium upsell links. */
+html.terminal-full #Desktop_PanelContainer_Id * {
+  border-radius: 0 !important;
+}
+
+html.terminal-full #Desktop_PanelContainer_Id .main-nowPlayingView-gradient,
+html.terminal-full #Desktop_PanelContainer_Id .main-nowPlayingView-content,
+html.terminal-full #Desktop_PanelContainer_Id .main-buddyFeed-container {
+  background-image: none !important;
+  background-color: var(--term-bg) !important;
+}
+
+html.terminal-full #Desktop_PanelContainer_Id h2,
+html.terminal-full #Desktop_PanelContainer_Id h3,
+html.terminal-full #Desktop_PanelContainer_Id :is(.main-nowPlayingView-sectionHeaderText, .main-buddyFeed-headerTitle, .main-devicePicker-sectionHeading, .main-devicePicker-headingTitle, .main-devicePicker-heading:not(:has(.main-devicePicker-headingTitle)), .main-nowPlayingView-creditsHeader):not(:is(h2, h3, h2 *, h3 *)):not(:has(h2, h3)) {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0 !important;
+}
+
+html.terminal-full #Desktop_PanelContainer_Id h2::before,
+html.terminal-full #Desktop_PanelContainer_Id h3::before,
+html.terminal-full #Desktop_PanelContainer_Id :is(.main-nowPlayingView-sectionHeaderText, .main-buddyFeed-headerTitle, .main-devicePicker-sectionHeading, .main-devicePicker-headingTitle, .main-devicePicker-heading:not(:has(.main-devicePicker-headingTitle)), .main-nowPlayingView-creditsHeader):not(:is(h2, h3, h2 *, h3 *)):not(:has(h2, h3))::before {
+  content: "# ";
+  color: var(--term-green);
+}
+
+/* Panel header (title + "…" + close ✕) */
+html.terminal-full .main-nowPlayingView-header,
+html.terminal-full .main-nowPlayingView-headerContainer {
+  border-bottom: 1px solid var(--term-border);
+  background: var(--term-bg) !important;
+}
+
+html.terminal-full [data-testid="PanelHeader_CloseButton"] svg {
+  display: none !important;
+}
+
+html.terminal-full [data-testid="PanelHeader_CloseButton"] {
+  min-width: 32px;
+  min-height: 32px;
+  color: var(--term-subdued) !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  transition: color var(--tf-fast) var(--tf-ease), border-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full [data-testid="PanelHeader_CloseButton"]::before {
+  content: "✕";
+  font-size: 14px;
+}
+
+html.terminal-full [data-testid="PanelHeader_CloseButton"]:is(:hover, :focus-visible) {
+  color: var(--term-text) !important;
+  border-color: var(--term-border) !important;
+}
+
+/* Now Playing view: cover, title, and cards (about, credits, tour, queue) */
+html.terminal-full .main-nowPlayingView-coverArtContainer {
+  outline: 1px solid var(--term-border);
+  outline-offset: 3px;
+}
+
+html.terminal-full .main-nowPlayingView-contextItemInfo a[data-encore-id="text"],
+html.terminal-full .main-nowPlayingView-contextItemInfo span[data-encore-id="text"],
+html.terminal-full .main-nowPlayingView-contextItemInfo .encore-text-headline-small,
+html.terminal-full .main-nowPlayingView-contextItemInfo .encore-text-headline-large {
+  letter-spacing: 0 !important;
+}
+
+html.terminal-full .main-nowPlayingView-section,
+html.terminal-full .main-nowPlayingView-aboutArtist,
+html.terminal-full .main-nowPlayingView-artistOnTour,
+html.terminal-full .main-nowPlayingView-credits,
+html.terminal-full .main-nowPlayingView-nextInQueue {
+  background-color: var(--term-bg) !important;
+  border: 1px solid var(--term-border);
+  box-shadow: none !important;
+  transition: border-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .main-nowPlayingView-section:hover,
+html.terminal-full .main-nowPlayingView-aboutArtist:hover,
+html.terminal-full .main-nowPlayingView-artistOnTour:hover,
+html.terminal-full .main-nowPlayingView-credits:hover,
+html.terminal-full .main-nowPlayingView-nextInQueue:hover {
+  border-color: var(--term-green-dim);
+}
+
+/* Nested cards: only the outer one gets the frame. */
+html.terminal-full :is(.main-nowPlayingView-section, .main-nowPlayingView-aboutArtist, .main-nowPlayingView-artistOnTour, .main-nowPlayingView-credits, .main-nowPlayingView-nextInQueue) .main-nowPlayingView-section,
+html.terminal-full :is(.main-nowPlayingView-section, .main-nowPlayingView-aboutArtist, .main-nowPlayingView-artistOnTour, .main-nowPlayingView-credits, .main-nowPlayingView-nextInQueue) .main-nowPlayingView-aboutArtist,
+html.terminal-full :is(.main-nowPlayingView-section, .main-nowPlayingView-aboutArtist, .main-nowPlayingView-artistOnTour, .main-nowPlayingView-credits, .main-nowPlayingView-nextInQueue) .main-nowPlayingView-artistOnTour,
+html.terminal-full :is(.main-nowPlayingView-section, .main-nowPlayingView-aboutArtist, .main-nowPlayingView-artistOnTour, .main-nowPlayingView-credits, .main-nowPlayingView-nextInQueue) .main-nowPlayingView-credits,
+html.terminal-full :is(.main-nowPlayingView-section, .main-nowPlayingView-aboutArtist, .main-nowPlayingView-artistOnTour, .main-nowPlayingView-credits, .main-nowPlayingView-nextInQueue) .main-nowPlayingView-nextInQueue {
+  border: 0;
+}
+
+html.terminal-full .main-nowPlayingView-aboutArtist :is(img, [style*="background-image"]) {
+  filter: grayscale(0.35) contrast(1.05);
+}
+
+html.terminal-full .main-nowPlayingView-creditsGroup {
+  border-left: 1px solid var(--term-border);
+  padding-left: 10px !important;
+  transition: border-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .main-nowPlayingView-creditsGroup:hover {
+  border-left-color: var(--term-green);
+}
+
+html.terminal-full .main-nowPlayingView-onTourTimeCard {
+  border: 1px solid var(--term-border);
+  background: var(--term-bg-elevated) !important;
+}
+
+html.terminal-full .main-nowPlayingView-onTourTimeMonth {
+  color: var(--term-green) !important;
+  text-transform: uppercase;
+}
+
+/* ls-style rows: queue preview, queue panel, friend activity, devices. */
+html.terminal-full .main-nowPlayingView-queueItem:not(tf-nx),
+html.terminal-full .main-nowPlayingView-artistOnTourItem:not(tf-nx),
+html.terminal-full .main-buddyFeed-friendActivity:not(tf-nx),
+html.terminal-full .main-devicePicker-devicesList > li,
+html.terminal-full #Desktop_PanelContainer_Id [data-encore-id="listRow"] {
+  position: relative;
+  background-color: transparent !important;
+  box-shadow: inset 2px 0 0 0 transparent;
+  transition: background-color var(--tf-fast) var(--tf-ease), box-shadow var(--tf-fast) var(--tf-ease);
+  /* backwards, not both: a forwards fill would pin transform:none on the
+     row for good, overriding any transform Spotify sets on it (list
+     virtualization, drag and drop). */
+  animation: tfp-row-in var(--tf-med) var(--tf-ease) backwards;
+}
+
+html.terminal-full .main-nowPlayingView-queueItem:not(tf-nx):hover,
+html.terminal-full .main-nowPlayingView-artistOnTourItem:not(tf-nx):hover,
+html.terminal-full .main-buddyFeed-friendActivity:not(tf-nx):hover,
+html.terminal-full .main-devicePicker-devicesList > li:hover,
+html.terminal-full #Desktop_PanelContainer_Id [data-encore-id="listRow"]:hover {
+  background-color: var(--term-bg-hi) !important;
+  box-shadow: inset 2px 0 0 0 var(--term-green);
+}
+
+html.terminal-full :is(.main-nowPlayingView-queueItem, .main-nowPlayingView-artistOnTourItem, .main-buddyFeed-friendActivity, .main-devicePicker-devicesList > li, #Desktop_PanelContainer_Id [data-encore-id="listRow"]):nth-child(2) { animation-delay: 20ms; }
+html.terminal-full :is(.main-nowPlayingView-queueItem, .main-nowPlayingView-artistOnTourItem, .main-buddyFeed-friendActivity, .main-devicePicker-devicesList > li, #Desktop_PanelContainer_Id [data-encore-id="listRow"]):nth-child(3) { animation-delay: 40ms; }
+html.terminal-full :is(.main-nowPlayingView-queueItem, .main-nowPlayingView-artistOnTourItem, .main-buddyFeed-friendActivity, .main-devicePicker-devicesList > li, #Desktop_PanelContainer_Id [data-encore-id="listRow"]):nth-child(4) { animation-delay: 60ms; }
+html.terminal-full :is(.main-nowPlayingView-queueItem, .main-nowPlayingView-artistOnTourItem, .main-buddyFeed-friendActivity, .main-devicePicker-devicesList > li, #Desktop_PanelContainer_Id [data-encore-id="listRow"]):nth-child(5) { animation-delay: 80ms; }
+html.terminal-full :is(.main-nowPlayingView-queueItem, .main-nowPlayingView-artistOnTourItem, .main-buddyFeed-friendActivity, .main-devicePicker-devicesList > li, #Desktop_PanelContainer_Id [data-encore-id="listRow"]):nth-child(6) { animation-delay: 100ms; }
+html.terminal-full :is(.main-nowPlayingView-queueItem, .main-nowPlayingView-artistOnTourItem, .main-buddyFeed-friendActivity, .main-devicePicker-devicesList > li, #Desktop_PanelContainer_Id [data-encore-id="listRow"]):nth-child(7) { animation-delay: 120ms; }
+html.terminal-full :is(.main-nowPlayingView-queueItem, .main-nowPlayingView-artistOnTourItem, .main-buddyFeed-friendActivity, .main-devicePicker-devicesList > li, #Desktop_PanelContainer_Id [data-encore-id="listRow"]):nth-child(n+8) { animation-delay: 140ms; }
+
+@keyframes tfp-row-in {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: none; }
+}
+
+html.terminal-full #Desktop_PanelContainer_Id :is(img, .main-avatar-avatar, .main-avatar-image) {
+  border-radius: 0 !important;
+}
+
+html.terminal-full .main-nowPlayingView-queueItemEntityImage,
+html.terminal-full .main-buddyFeed-avatarContainer {
+  outline: 1px solid var(--term-border);
+  outline-offset: 1px;
+}
+
+/* Encore pill buttons in the pane (Follow, Show all, Open queue…) become
+   square bordered text buttons, inverse on hover. */
+html.terminal-full #Desktop_PanelContainer_Id [data-encore-id="buttonSecondary"] {
+  border: 1px solid var(--term-border) !important;
+  box-shadow: none !important;
+  font-size: 12px;
+  transition: border-color var(--tf-fast) var(--tf-ease), color var(--tf-fast) var(--tf-ease), background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full #Desktop_PanelContainer_Id [data-encore-id="buttonSecondary"]:is(:hover, :focus-visible) {
+  border-color: var(--term-green) !important;
+  color: var(--term-green) !important;
+}
+
+/* Promos: merch shelf and Premium upsells. */
+html.terminal-full .main-nowPlayingView-merch,
+html.terminal-full #Desktop_PanelContainer_Id a[href*="spotify.com/premium"],
+html.terminal-full #Desktop_PanelContainer_Id [data-testid*="upsell" i] {
+  display: none !important;
+}
+
+/* Friend activity as a `who` listing: @user in green, dim timestamp and
+   dashed separators between rows. */
+html.terminal-full .main-buddyFeed-friendActivity {
+  border-bottom: 1px dashed var(--term-border);
+}
+
+html.terminal-full .main-buddyFeed-username a,
+html.terminal-full .main-buddyFeed-username {
+  color: var(--term-green) !important;
+}
+
+html.terminal-full .main-buddyFeed-username a::before {
+  content: "@";
+  color: var(--term-subdued);
+}
+
+html.terminal-full .main-buddyFeed-timestamp {
+  color: var(--term-subdued) !important;
+  font-size: 10px !important;
+  font-variant-numeric: tabular-nums;
+}
+
+html.terminal-full .main-buddyFeed-playbackContext {
+  color: var(--term-subdued) !important;
+}
+
+html.terminal-full .main-buddyFeed-playbackContext::before {
+  content: "└ ";
+  color: var(--term-border);
+}
+
+/* Connect devices: `aplay -l`-style list, current device in green. */
+html.terminal-full .main-devicePicker-devicesList > li {
+  border-bottom: 1px dashed var(--term-border);
+}
+
+html.terminal-full .main-devicePicker-headingConnected,
+html.terminal-full .main-devicePicker-connected {
+  color: var(--term-green) !important;
+}
+
+html.terminal-full .main-devicePicker-headingConnected::before {
+  content: "▸ ";
+}
+
+html.terminal-full .main-devicePicker-troubleshooting {
+  border-top: 1px dashed var(--term-border);
+  color: var(--term-subdued) !important;
+}
+
+/* ---------- 3. Lyrics view (page, sidebar pane, cinema) ----------------
+   Spotify sets the lyrics colors inline from the cover art
+   (style="--lyrics-color-active: …" on the container). A rule that matches
+   the inline style itself beats it, the same technique the v1.2 cinema
+   rule above uses. Each line is prefixed "> ". The active line is green
+   with a blinking block caret, past lines are dimmed and upcoming lines
+   are subdued. Also covers the lyrics-plus custom app
+   (.lyrics-lyricsContainer-*). */
+html.terminal-full [style*="--lyrics-color"],
+html.terminal-full .lyrics-lyrics-container,
+html.terminal-full .main-nowPlayingView-section {
+  --lyrics-color-active: var(--term-green) !important;
+  --lyrics-color-inactive: var(--term-subdued) !important;
+  --lyrics-color-passed: var(--term-subdued) !important;
+  --lyrics-color-messaging: var(--term-subdued) !important;
+  --lyrics-color-background: var(--term-bg) !important;
+}
+
+html.terminal-full .lyrics-lyrics-background,
+html.terminal-full .lyrics-lyrics-container,
+html.terminal-full .lyrics-lyrics-contentWrapper,
+html.terminal-full .main-nowPlayingView-lyricsGradient,
+html.terminal-full .Root__lyrics-cinema,
+html.terminal-full .main-lyricsCinema-container,
+html.terminal-full .lyrics-lyricsContainer-LyricsBackground {
+  background-color: var(--term-bg) !important;
+  background-image: none !important;
+}
+
+html.terminal-full .main-nowPlayingView-lyricsContent {
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+}
+
+html.terminal-full .lyrics-lyricsContent-lyric,
+html.terminal-full .lyrics-lyricsContainer-LyricsLine {
+  color: var(--term-subdued) !important;
+  letter-spacing: 0 !important;
+  font-weight: 600;
+  transition: color var(--tf-med) var(--tf-ease), opacity var(--tf-med) var(--tf-ease);
+}
+
+html.terminal-full .lyrics-lyricsContent-lyric:not(:empty)::before,
+html.terminal-full .lyrics-lyricsContainer-LyricsLine:not(:empty)::before {
+  content: "> ";
+  color: var(--term-border);
+  white-space: pre;
+}
+
+html.terminal-full .lyrics-lyricsContent-previous,
+html.terminal-full .lyrics-lyricsContent-highlight,
+html.terminal-full .lyrics-lyricsContainer-LyricsLine-past {
+  opacity: 0.5;
+}
+
+html.terminal-full .lyrics-lyricsContent-lyric.lyrics-lyricsContent-active,
+html.terminal-full .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active {
+  color: var(--term-green) !important;
+  opacity: 1;
+}
+
+html.terminal-full .lyrics-lyricsContent-lyric.lyrics-lyricsContent-active::before,
+html.terminal-full .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active::before {
+  color: var(--term-green);
+}
+
+html.terminal-full .lyrics-lyricsContent-lyric.lyrics-lyricsContent-active:not(:empty)::after,
+html.terminal-full .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active:not(:empty)::after {
+  content: "▋";
+  margin-left: 0.25em;
+  animation: term-blink 1s step-end infinite;
+}
+
+html.terminal-full .lyrics-lyricsContent-provider,
+html.terminal-full .lyrics-lyricsContainer-Provider {
+  color: var(--term-subdued) !important;
+  font-size: 11px !important;
+}
+
+html.terminal-full .lyrics-lyricsContent-provider::before,
+html.terminal-full .lyrics-lyricsContainer-Provider::before {
+  content: "# ";
+  color: var(--term-green);
+}
+
+/* ---------- 3b. Fullscreen / cinema view -------------------------------
+   Drop the blurred cover-art backdrop and the Spotify wordmark, square
+   the cover, frame the up-next card. The transport, seek bar and volume
+   already pick up the status line rules above through their data-testids,
+   and the bottom bar gets the same top rule and tinted background. */
+html.terminal-full .Root__cinema-view,
+html.terminal-full .npv-main-container {
+  background: var(--term-bg) !important;
+}
+
+html.terminal-full .npv-background-image,
+html.terminal-full .npv-background-image__overlay,
+html.terminal-full .npv-background-color,
+html.terminal-full .npv-blur,
+html.terminal-full .npv-lyrics__gradient-background {
+  display: none !important;
+}
+
+html.terminal-full .npv-main-container svg[aria-label="Spotify"],
+html.terminal-full .npv-main-container a[aria-label="Spotify"] {
+  display: none !important;
+}
+
+html.terminal-full .npv-main-container *,
+html.terminal-full .Root__cinema-view * {
+  border-radius: 0 !important;
+}
+
+/* A 1px frame, so fullscreen reads as a maximized terminal window rather
+   than a poster. */
+html.terminal-full .npv-main-container {
+  box-shadow: inset 0 0 0 1px var(--term-border) !important;
+}
+
+html.terminal-full .npv-cover-art {
+  outline: 1px solid var(--term-border);
+  outline-offset: 4px;
+  box-shadow: none !important;
+}
+
+html.terminal-full .npv-track a,
+html.terminal-full .npv-track span {
+  letter-spacing: 0 !important;
+}
+
+html.terminal-full .npv-up-next {
+  background: var(--term-bg-elevated) !important;
+  border: 1px solid var(--term-border);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45) !important;
+}
+
+html.terminal-full .npv-up-next::before {
+  content: "# up next";
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: var(--term-green);
+}
+
+html.terminal-full .npv-nowPlayingBar-container,
+html.terminal-full .main-lyricsCinema-controls {
+  background: var(--term-bg-tinted) !important;
+  border-top: 1px solid var(--term-border);
+}
+
+html.terminal-full .npv-exitFullScreenButton-button {
+  width: auto !important;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0 10px !important;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--term-subdued) !important;
+  background: transparent !important;
+  border: 1px solid var(--term-border) !important;
+  transition: color var(--tf-fast) var(--tf-ease), border-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .npv-exitFullScreenButton-button svg {
+  display: none !important;
+}
+
+html.terminal-full .npv-exitFullScreenButton-button::before {
+  content: "✕ exit";
+}
+
+html.terminal-full .npv-exitFullScreenButton-button:is(:hover, :focus-visible) {
+  color: var(--term-green) !important;
+  border-color: var(--term-green) !important;
+}
+
+/* Reduced motion: the global rule above already cuts every animation to
+   0.01ms. This also removes the row fade-in, the status line's breathing
+   and the lyrics caret blink outright, so nothing is left running. */
+@media (prefers-reduced-motion: reduce) {
+  html.terminal-full :is(.main-nowPlayingView-queueItem, .main-nowPlayingView-artistOnTourItem, .main-buddyFeed-friendActivity, .main-devicePicker-devicesList > li, #Desktop_PanelContainer_Id [data-encore-id="listRow"]),
+html.terminal-full .Root__now-playing-bar::before,
+html.terminal-full .main-nowPlayingWidget-coverArt::after,
+html.terminal-full .lyrics-lyricsContent-active::after,
+html.terminal-full .lyrics-lyricsContainer-LyricsLine-active::after {
+    animation: none !important;
+  }
+}
+/* --- END FULL/PLAYER ----------------------------------------------------- */
+
+/* --- FULL/PAGES (agent C) ------------------------------------------------ */
+/* Everything inside the main view: home shelves, search/browse, entity
+   headers (playlist/album/artist/show/episode/profile), action bars,
+   tracklists, collection tiles, skeletons, settings. Hooks are, in order of
+   preference, data-testid / data-encore-id / ARIA / Encore tokens, then the
+   mapped main-* / x-* / view-* classes (spicetify rewrites the hashed names
+   to these at apply time). No raw hashes, no path[d] matching.
+   Glyphs that also exist as emoji (▶ ♥ ⏱) carry U+FE0E so a colour emoji
+   font never gets picked as the fallback on Windows/Linux. */
+
+/* ---- 0. Encore colour sets --------------------------------------------
+   Spotify re-declares its colour tokens on nested "set" elements — the
+   green play buttons (.encore-bright-accent-set), white pills
+   (.encore-inverted-light-set) and plain surfaces (.encore-base-set). A
+   :root !important override does not reach those: a custom property set
+   directly on an element beats the inherited one. Re-declaring them here
+   is what removes the last Spotify greens. Inverted = terminal inverse
+   video (light text colour as background), bright accent = our one teal. */
+html.terminal-full .encore-base-set,
+html.terminal-full .encore-dark-theme .encore-base-set {
+  --background-base: var(--term-bg) !important;
+  --background-highlight: var(--term-bg-hi) !important;
+  --background-press: var(--term-bg-press) !important;
+  --background-elevated-base: var(--term-bg-elevated) !important;
+  --background-elevated-highlight: var(--term-bg-elevated-hi) !important;
+  --background-elevated-press: var(--term-bg-press) !important;
+  --background-tinted-base: var(--term-bg-tinted) !important;
+  --background-tinted-highlight: var(--term-bg-tinted-hi) !important;
+  --background-tinted-press: var(--term-bg-tinted-press) !important;
+  --text-base: var(--term-text) !important;
+  --text-subdued: var(--term-subdued) !important;
+  --text-bright-accent: var(--term-green) !important;
+  --text-positive: var(--term-green) !important;
+  --essential-base: var(--term-text) !important;
+  --essential-subdued: var(--term-subdued) !important;
+  --essential-bright-accent: var(--term-green) !important;
+  --essential-positive: var(--term-green) !important;
+  --decorative-base: var(--term-text) !important;
+  --decorative-subdued: var(--term-border) !important;
+}
+
+html.terminal-full .encore-bright-accent-set,
+html.terminal-full .encore-dark-theme .encore-bright-accent-set {
+  --background-base: var(--term-green) !important;
+  --background-highlight: var(--term-green) !important;
+  --background-press: var(--term-green-dim) !important;
+  --background-elevated-base: var(--term-green) !important;
+  --background-elevated-highlight: var(--term-green) !important;
+  --background-elevated-press: var(--term-green-dim) !important;
+  --text-base: var(--term-bg) !important;
+  --text-subdued: var(--term-bg-elevated) !important;
+  --text-bright-accent: var(--term-green) !important;
+  --essential-base: var(--term-bg) !important;
+  --essential-subdued: var(--term-bg-elevated) !important;
+  --essential-bright-accent: var(--term-green) !important;
+}
+
+html.terminal-full .encore-inverted-light-set,
+html.terminal-full .encore-dark-theme .encore-inverted-light-set {
+  --background-base: var(--term-text) !important;
+  --background-highlight: var(--term-green) !important;
+  --background-press: var(--term-green-dim) !important;
+  --text-base: var(--term-bg) !important;
+  --text-subdued: var(--term-bg-elevated) !important;
+  --text-bright-accent: var(--term-green-dim) !important;
+  --essential-base: var(--term-bg) !important;
+  --essential-subdued: var(--term-bg-elevated) !important;
+  --essential-bright-accent: var(--term-green-dim) !important;
+}
+
+/* ---- 1. Shape reset for the whole main view ---------------------------
+   Square everything: covers, artist avatars (profile + artist cards),
+   chips, buttons, inputs, tiles. One broad rule instead of a whitelist,
+   because every "rounded" surface in there is a Spotify tell. */
+html.terminal-full .Root__main-view,
+html.terminal-full .Root__main-view * {
+  border-radius: 0 !important;
+}
+
+/* Covers get a flat 1px frame instead of Spotify's soft drop shadow. */
+html.terminal-full .Root__main-view .main-card-imageContainer,
+html.terminal-full .Root__main-view .main-entityHeader-imageContainer,
+html.terminal-full .Root__main-view .x-entityImage-imageContainer,
+html.terminal-full .Root__main-view .view-homeShortcutsGrid-imageContainer {
+  box-shadow: none !important;
+}
+
+html.terminal-full .Root__main-view .main-card-imageContainer :is(img, [class*="cardImage"]) {
+  box-shadow: none !important;
+}
+
+/* Page footer: Spotify company links + "© Spotify AB". Pure branding. */
+html.terminal-full .main-page-footerContainer,
+html.terminal-full .main-page-footerSectionWrapper {
+  display: none !important;
+}
+
+/* ---- 2. Home ---------------------------------------------------------- */
+/* Home header carries a colour wash picked from the recent shortcuts. */
+html.terminal-full .main-home-homeHeader {
+  background: none !important;
+  background-color: transparent !important;
+}
+
+/* Filter chips (All / Music / Podcasts, and the search result filters):
+   bracket tabs. The sticky strip they sit on becomes a flat bar with a
+   1px rule under it. */
+html.terminal-full .main-home-filterChipsSection {
+  background-color: var(--term-bg) !important;
+  box-shadow: none !important;
+  border-bottom: 1px solid var(--term-border);
+}
+
+html.terminal-full .main-home-filterChipsSection::after {
+  display: none !important;
+}
+
+html.terminal-full .Root__main-view [data-encore-id="chip"] {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html.terminal-full .Root__main-view [class*="ChipInnerComponent"] {
+  background: transparent !important;
+  color: var(--term-subdued) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  min-block-size: 32px;
+  padding-inline: 4px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0 !important;
+  transition: color var(--tf-fast) var(--tf-ease), background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view [class*="ChipInnerComponent"]::before {
+  content: "[ ";
+  white-space: pre;
+  color: var(--term-border);
+  transition: color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view [class*="ChipInnerComponent"]::after {
+  content: " ]";
+  white-space: pre;
+  color: var(--term-border);
+  transition: color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view :hover > [class*="ChipInnerComponent"],
+html.terminal-full .Root__main-view [class*="ChipInnerComponent"]:hover {
+  color: var(--term-text) !important;
+}
+
+html.terminal-full .Root__main-view :hover > [class*="ChipInnerComponent"]::before,
+html.terminal-full .Root__main-view :hover > [class*="ChipInnerComponent"]::after,
+html.terminal-full .Root__main-view [class*="ChipInnerComponent"]:hover::before,
+html.terminal-full .Root__main-view [class*="ChipInnerComponent"]:hover::after {
+  color: var(--term-green);
+}
+
+/* Selected tab: inverse video, the terminal way of saying "active". */
+html.terminal-full .Root__main-view [class*="ChipInnerComponent"][class*="selected"],
+html.terminal-full .Root__main-view [aria-checked="true"] > [class*="ChipInnerComponent"],
+html.terminal-full .Root__main-view [aria-selected="true"] > [class*="ChipInnerComponent"] {
+  background: var(--term-green) !important;
+  color: var(--term-bg) !important;
+  font-weight: 700 !important;
+}
+
+html.terminal-full .Root__main-view [class*="ChipInnerComponent"][class*="selected"]::before,
+html.terminal-full .Root__main-view [class*="ChipInnerComponent"][class*="selected"]::after,
+html.terminal-full .Root__main-view [aria-checked="true"] > [class*="ChipInnerComponent"]::before,
+html.terminal-full .Root__main-view [aria-checked="true"] > [class*="ChipInnerComponent"]::after,
+html.terminal-full .Root__main-view [aria-selected="true"] > [class*="ChipInnerComponent"]::before,
+html.terminal-full .Root__main-view [aria-selected="true"] > [class*="ChipInnerComponent"]::after {
+  color: var(--term-bg);
+}
+
+/* Recent shortcuts grid: compact table. The 1px grid gap over a border
+   coloured background draws the table rules; each cell is one row
+   (tiny cover, name). A prompt line labels the block. */
+html.terminal-full .view-homeShortcutsGrid-shortcuts::before {
+  content: "$ ls -t ~/récents";
+  display: block;
+  margin-block-end: 8px;
+  font-size: 12px;
+  color: var(--term-subdued);
+}
+
+html.terminal-full .view-homeShortcutsGrid-grid {
+  gap: 1px !important;
+  background-color: var(--term-border);
+  border: 1px solid var(--term-border);
+}
+
+html.terminal-full .view-homeShortcutsGrid-shortcut,
+html.terminal-full .view-homeShortcutsGrid-draggable {
+  background-color: var(--term-bg) !important;
+  box-shadow: none !important;
+}
+
+html.terminal-full .view-homeShortcutsGrid-shortcut {
+  position: relative;
+  transition: background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .view-homeShortcutsGrid-shortcut:hover,
+html.terminal-full .view-homeShortcutsGrid-shortcut:focus-within {
+  background-color: var(--term-bg-elevated-hi) !important;
+  box-shadow: inset 2px 0 0 var(--term-green) !important;
+}
+
+html.terminal-full .view-homeShortcutsGrid-name {
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0 !important;
+}
+
+html.terminal-full .view-homeShortcutsGrid-shortcut:hover .view-homeShortcutsGrid-name {
+  color: var(--term-green) !important;
+}
+
+/* Liked-songs "equaliser" GIF in the shortcut → a steady ▶ in our teal. */
+html.terminal-full .Root__main-view .view-homeShortcutsGrid-equaliser:not(tf-nx),
+html.terminal-full .Root__main-view .view-homeShortcutsGrid-equaliserImage:not(tf-nx),
+html.terminal-full .Root__main-view .view-homeShortcutsGrid-playingIcon:not(tf-nx),
+html.terminal-full .Root__main-view .main-trackList-playingIcon:not(tf-nx),
+html.terminal-full .Root__main-view img[src*="equaliser"] {
+  display: none !important;
+}
+
+/* Subject is the index cell (class-bucketed) rather than "any element in a
+   row", which made Chromium run a :has() check on every node of every row. */
+html.terminal-full .Root__main-view .main-trackList-rowSectionIndex:has(> :is(.main-trackList-playingIcon, img[src*="equaliser"]))::before {
+  content: "▶\FE0E";
+  color: var(--term-green);
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* Shelves: `$ ls ~/<shelf>` headings, "Show all" as [+more]. Search
+   result sections and the browse grid heading use the same treatment so
+   every listing in the app reads alike. */
+html.terminal-full .Root__main-view .main-shelf-title:not(#tf-nx):not(tf-nx):not(tf-nx),
+html.terminal-full .Root__main-view .search-searchBrowse-SearchBrowse h2:not(#tf-nx):not(tf-nx),
+html.terminal-full .Root__main-view #searchPage section > h2 {
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  text-transform: lowercase;
+  line-height: 1.4 !important;
+}
+
+html.terminal-full .Root__main-view .main-shelf-title:not(#tf-nx):not(tf-nx):not(tf-nx)::before,
+html.terminal-full .Root__main-view .search-searchBrowse-SearchBrowse h2:not(#tf-nx):not(tf-nx)::before,
+html.terminal-full .Root__main-view #searchPage section > h2::before {
+  content: "$ ls ~/";
+  color: var(--term-green);
+  font-weight: 400;
+}
+
+html.terminal-full .Root__main-view .main-shelf-title a {
+  color: inherit !important;
+  text-decoration: none !important;
+  background-image: linear-gradient(var(--term-green), var(--term-green));
+  background-size: 0% 1px;
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+}
+
+html.terminal-full .Root__main-view .main-shelf-title a:hover {
+  background-size: 100% 1px;
+}
+
+html.terminal-full .Root__main-view .main-shelf-subHeader,
+html.terminal-full .Root__main-view .main-shelf-subHeader * {
+  font-size: 11px !important;
+  color: var(--term-subdued) !important;
+  text-transform: none;
+}
+
+html.terminal-full .Root__main-view .main-shelf-subHeader::before {
+  content: "# ";
+  color: var(--term-border);
+}
+
+/* The native text keeps its accessible name (font-size:0, not display:none);
+   the visible label is drawn by ::after. */
+html.terminal-full .Root__main-view .main-shelf-seeAll,
+html.terminal-full .Root__main-view .main-seeAll-link,
+html.terminal-full .Root__main-view .search-recentSearches-seeAll,
+html.terminal-full .Root__main-view :is(.main-shelf-seeAll, .main-seeAll-link, .search-recentSearches-seeAll) * {
+  font-size: 0 !important;
+  text-decoration: none !important;
+}
+
+html.terminal-full .Root__main-view .main-shelf-seeAll,
+html.terminal-full .Root__main-view .main-seeAll-link,
+html.terminal-full .Root__main-view .search-recentSearches-seeAll {
+  display: inline-flex !important;
+  align-items: center;
+  min-block-size: 32px;
+  padding-inline: 4px;
+}
+
+html.terminal-full .Root__main-view .main-shelf-seeAll::after,
+html.terminal-full .Root__main-view .main-seeAll-link::after,
+html.terminal-full .Root__main-view .search-recentSearches-seeAll::after {
+  content: "[+more]";
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--term-subdued);
+  transition: color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view .main-shelf-seeAll:hover::after,
+html.terminal-full .Root__main-view .main-seeAll-link:hover::after,
+html.terminal-full .Root__main-view .search-recentSearches-seeAll:hover::after {
+  color: var(--term-green);
+}
+
+html.terminal-full .Root__main-view .main-shelf-shelf + .main-shelf-shelf,
+html.terminal-full .Root__main-view .main-shelf-section + .main-shelf-section {
+  border-top: 1px dashed var(--term-border);
+  padding-top: 12px;
+}
+
+/* ---- 3. Cards --------------------------------------------------------
+   Square file boxes: flat tinted fill, 1px frame, mono title. Hover:
+   frame turns teal, the title flips to inverse video with a left-to-right
+   sweep, and a single scan line runs down the cover. No lift, no glow. */
+html.terminal-full .Root__main-view .main-card-card,
+html.terminal-full .Root__main-view .main-heroCard-card,
+html.terminal-full .Root__main-view [data-testid="top-result-card"] {
+  background: var(--term-bg-tinted) !important;
+  border: 1px solid var(--term-border) !important;
+  box-shadow: none !important;
+  transform: none !important;
+  transition: border-color var(--tf-fast) var(--tf-ease), background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view .main-card-card:hover,
+html.terminal-full .Root__main-view .main-heroCard-card:hover,
+html.terminal-full .Root__main-view [data-testid="top-result-card"]:hover,
+html.terminal-full .Root__main-view .main-card-card:focus-within,
+html.terminal-full .Root__main-view .main-heroCard-card:focus-within,
+html.terminal-full .Root__main-view [data-testid="top-result-card"]:focus-within {
+  background: var(--term-bg-elevated) !important;
+  border-color: var(--term-green) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+/* Spotify paints its own hover wash with a pseudo-element on the card. */
+html.terminal-full .Root__main-view .main-card-card::after {
+  background: none !important;
+}
+
+html.terminal-full .Root__main-view .main-card-card .main-card-imageContainer {
+  position: relative;
+  overflow: hidden;
+  outline: 1px solid var(--term-border);
+}
+
+html.terminal-full .Root__main-view .main-card-card .main-card-imageContainer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent 0 94%, var(--term-green) 94% 96%, transparent 96%);
+  opacity: 0;
+}
+
+html.terminal-full .Root__main-view .main-card-card:hover .main-card-imageContainer::after {
+  animation: tf-card-scan var(--tf-slow) var(--tf-ease);
+}
+
+@keyframes tf-card-scan {
+  from { opacity: 1; transform: translateY(-100%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+html.terminal-full .Root__main-view .main-card-cardTitle,
+html.terminal-full .Root__main-view .main-card-cardTitleLink {
+  position: relative;
+  isolation: isolate;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  transition: color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view .main-card-cardTitle::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--term-green);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--tf-med) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view .main-card-card:hover .main-card-cardTitle::before {
+  transform: scaleX(1);
+}
+
+html.terminal-full .Root__main-view .main-card-card:hover :is(.main-card-cardTitle, .main-card-cardTitle *) {
+  color: var(--term-bg) !important;
+}
+
+html.terminal-full .Root__main-view .main-card-cardMetadata,
+html.terminal-full .Root__main-view .main-card-cardMetadata * {
+  font-size: 12px !important;
+  color: var(--term-subdued) !important;
+}
+
+/* First item of each shelf: the "newest file" of the listing — teal frame
+   and a ▸ marker before its title. Same box size, so the grid is intact. */
+html.terminal-full .Root__main-view :is(.main-shelf-shelfGrid, .main-gridContainer-gridContainer) > :first-child .main-card-card,
+html.terminal-full .Root__main-view :is(.main-shelf-shelfGrid, .main-gridContainer-gridContainer) > .main-card-card:first-child {
+  border-color: var(--term-green-dim) !important;
+  background: var(--term-bg-elevated) !important;
+}
+
+html.terminal-full .Root__main-view :is(.main-shelf-shelfGrid, .main-gridContainer-gridContainer) > :first-child .main-card-card .main-card-imageContainer::before,
+html.terminal-full .Root__main-view :is(.main-shelf-shelfGrid, .main-gridContainer-gridContainer) > .main-card-card:first-child .main-card-imageContainer::before {
+  content: "▸ 01";
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--term-green);
+  color: var(--term-bg);
+  pointer-events: none;
+}
+
+/* Hover play button on cards / shortcuts / hero cards: a square [▶].
+   The native SVG stays (it is what flips between play and pause), just
+   tinted teal and flanked by brackets. */
+html.terminal-full .Root__main-view .main-card-PlayButtonContainer,
+html.terminal-full .Root__main-view .view-homeShortcutsGrid-PlayButtonContainer,
+html.terminal-full .Root__main-view .main-heroCard-PlayButtonContainer {
+  box-shadow: none !important;
+}
+
+html.terminal-full .Root__main-view :is(.main-card-PlayButtonContainer, .view-homeShortcutsGrid-PlayButtonContainer, .main-heroCard-PlayButtonContainer) button {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  inline-size: auto !important;
+  min-inline-size: 40px;
+  block-size: 32px !important;
+  padding: 0 6px !important;
+  background: var(--term-bg) !important;
+  border: 1px solid var(--term-green) !important;
+  color: var(--term-green) !important;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45) !important;
+  font-size: 13px;
+  transform: none !important;
+  transition: background-color var(--tf-fast) var(--tf-ease), color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view :is(.main-card-PlayButtonContainer, .view-homeShortcutsGrid-PlayButtonContainer, .main-heroCard-PlayButtonContainer) button::before {
+  content: "[";
+}
+
+html.terminal-full .Root__main-view :is(.main-card-PlayButtonContainer, .view-homeShortcutsGrid-PlayButtonContainer, .main-heroCard-PlayButtonContainer) button::after {
+  content: "]";
+}
+
+html.terminal-full .Root__main-view :is(.main-card-PlayButtonContainer, .view-homeShortcutsGrid-PlayButtonContainer, .main-heroCard-PlayButtonContainer) button > span {
+  background: transparent !important;
+  color: inherit !important;
+  inline-size: auto !important;
+  block-size: auto !important;
+  min-block-size: 0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+html.terminal-full .Root__main-view :is(.main-card-PlayButtonContainer, .view-homeShortcutsGrid-PlayButtonContainer, .main-heroCard-PlayButtonContainer) button svg {
+  inline-size: 12px !important;
+  block-size: 12px !important;
+  fill: currentColor !important;
+  color: inherit !important;
+}
+
+html.terminal-full .Root__main-view :is(.main-card-PlayButtonContainer, .view-homeShortcutsGrid-PlayButtonContainer, .main-heroCard-PlayButtonContainer) button:hover {
+  background: var(--term-green) !important;
+  color: var(--term-bg) !important;
+}
+
+/* ---- 4. Search / browse ---------------------------------------------
+   Genre tiles: Spotify paints each tile with a vivid inline
+   background-color plus a rotated cover. We keep that colour only as a
+   4px left bar (a background-image drawn over the inline colour, which it
+   cannot beat otherwise) and drop the rotated art: a monochrome box with
+   a mono label and a `cd ›` hint on hover. */
+html.terminal-full .Root__main-view .x-categoryCard-CategoryCard,
+html.terminal-full .Root__main-view [class*="heroCategoryCard-HeroCategoryCard"] {
+  background-image: linear-gradient(90deg, transparent 0 4px, var(--term-bg-tinted) 4px) !important;
+  border: 1px solid var(--term-border) !important;
+  box-shadow: none !important;
+  position: relative;
+  overflow: hidden;
+  transform: none !important;
+  transition: border-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view .x-categoryCard-CategoryCard:hover,
+html.terminal-full .Root__main-view [class*="heroCategoryCard-HeroCategoryCard"]:hover,
+html.terminal-full .Root__main-view .x-categoryCard-CategoryCard:focus-visible,
+html.terminal-full .Root__main-view [class*="heroCategoryCard-HeroCategoryCard"]:focus-visible {
+  border-color: var(--term-green) !important;
+}
+
+/* The cover stays as a small, straight, greyscale thumbnail in the
+   corner — texture without the vivid rotated sticker. */
+html.terminal-full .Root__main-view .x-categoryCard-image,
+html.terminal-full .Root__main-view [class*="heroCategoryCard-image"] {
+  inset: auto 10px 10px auto !important;
+  inline-size: 30% !important;
+  block-size: auto !important;
+  aspect-ratio: 1;
+  transform: none !important;
+  filter: grayscale(1) contrast(1.1);
+  opacity: 0.3;
+  box-shadow: none !important;
+  outline: 1px solid var(--term-border);
+  transition: opacity var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="heroCategoryCard-HeroCategoryCard"]):hover .x-categoryCard-image,
+html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="heroCategoryCard-HeroCategoryCard"]):hover [class*="heroCategoryCard-image"] {
+  opacity: 0.6;
+}
+
+html.terminal-full .Root__main-view .x-categoryCard-title,
+html.terminal-full .Root__main-view [class*="heroCategoryCard-heroTitle"] {
+  color: var(--term-text) !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  line-height: 1.35 !important;
+  isolation: isolate;
+  padding-inline: 2px;
+}
+
+html.terminal-full .Root__main-view .x-categoryCard-title::before,
+html.terminal-full .Root__main-view [class*="heroCategoryCard-heroTitle"]::before {
+  content: "~/";
+  color: var(--term-subdued);
+  font-weight: 400;
+}
+
+html.terminal-full .Root__main-view .x-categoryCard-CategoryCard::after,
+html.terminal-full .Root__main-view [class*="heroCategoryCard-HeroCategoryCard"]::after {
+  content: "cd ›";
+  position: absolute;
+  left: 16px;
+  bottom: 10px;
+  font-size: 12px;
+  color: var(--term-green);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity var(--tf-fast) var(--tf-ease), transform var(--tf-fast) var(--tf-ease);
+  pointer-events: none;
+}
+
+html.terminal-full .Root__main-view .x-categoryCard-CategoryCard:hover::after,
+html.terminal-full .Root__main-view [class*="heroCategoryCard-HeroCategoryCard"]:hover::after {
+  opacity: 1;
+  transform: none;
+}
+
+html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="heroCategoryCard-HeroCategoryCard"]):hover .x-categoryCard-title,
+html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="heroCategoryCard-HeroCategoryCard"]):hover [class*="heroCategoryCard-heroTitle"] {
+  color: var(--term-green) !important;
+}
+
+/* ---- 5. Entity headers (playlist, album, artist, show, episode,
+   profile) -------------------------------------------------------------
+   No wash (already flattened in the base theme), a 1px rule under the
+   block, framed cover, a big mono title with a prompt and a blinking block
+   cursor, revealed once by a steps() "typing" mask. Metadata become
+   `key: value` lines — theme.js tags each native piece with data-tf-key
+   and sets data-tf-meta on the container only once that worked, so the
+   layout never changes when the script can't classify the header. */
+html.terminal-full .Root__main-view .main-entityHeader-container {
+  border-bottom: 1px solid var(--term-border);
+}
+
+html.terminal-full .Root__main-view .main-entityHeader-imageContainer {
+  outline: 1px solid var(--term-border);
+  outline-offset: 3px;
+}
+
+html.terminal-full .Root__main-view .main-entityHeader-pretitle,
+html.terminal-full .Root__main-view .main-entityHeader-pretitle * {
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  text-transform: lowercase !important;
+  letter-spacing: 0 !important;
+  color: var(--term-subdued) !important;
+}
+
+html.terminal-full .Root__main-view .main-entityHeader-pretitle::before {
+  content: "# ";
+  color: var(--term-green-dim);
+}
+
+html.terminal-full .Root__main-view .main-entityHeader-title {
+  position: relative;
+  overflow: hidden;
+}
+
+html.terminal-full .Root__main-view .main-entityHeader-title h1,
+html.terminal-full .Root__main-view .main-entityHeader-title h2 {
+  font-size: clamp(28px, 4.4vw, 60px) !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em !important;
+  line-height: 1.12 !important;
+  color: var(--term-text) !important;
+}
+
+html.terminal-full .Root__main-view .main-entityHeader-title h1::before,
+html.terminal-full .Root__main-view .main-entityHeader-title h2::before {
+  content: "> ";
+  color: var(--term-green);
+  font-weight: 400;
+}
+
+html.terminal-full .Root__main-view .main-entityHeader-title h1::after,
+html.terminal-full .Root__main-view .main-entityHeader-title h2::after {
+  content: "▋";
+  margin-left: 0.08em;
+  color: var(--term-green);
+  font-weight: 400;
+  animation: term-blink 1s step-end infinite;
+}
+
+/* The typing reveal: an opaque strip in the page colour slides off the
+   title in 18 discrete steps. It is invisible at rest (opacity 0), so if
+   the animation is skipped (reduced motion) nothing stays covered. */
+html.terminal-full .Root__main-view .main-entityHeader-title::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--term-bg);
+  pointer-events: none;
+  opacity: 0;
+  animation: tf-title-type var(--tf-slow) steps(18, end) 1;
+}
+
+@keyframes tf-title-type {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 1; transform: translateX(100%); }
+}
+
+html.terminal-full .Root__main-view .main-entityHeader-metaData[data-tf-meta] {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  flex-wrap: nowrap !important;
+  gap: 1px;
+  margin-top: 8px;
+  font-size: 13px !important;
+}
+
+html.terminal-full .Root__main-view .main-entityHeader-metaData[data-tf-meta] > [data-tf-key],
+html.terminal-full .Root__main-view .main-entityHeader-metaData[data-tf-meta] > * > [data-tf-key] {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  margin: 0 !important;
+  line-height: 1.6;
+}
+
+html.terminal-full .Root__main-view [data-tf-key]::before {
+  content: attr(data-tf-key) ":" !important;
+  display: inline-block;
+  min-inline-size: 8ch;
+  margin: 0 !important;
+  color: var(--term-subdued);
+  font-weight: 400;
+  opacity: 1 !important;
+}
+
+html.terminal-full .Root__main-view [data-tf-key="sep"] {
+  display: none !important;
+}
+
+html.terminal-full .Root__main-view .main-entityHeader-metaData[data-tf-meta] :is(.main-avatar-avatar, img) {
+  inline-size: 18px !important;
+  block-size: 18px !important;
+}
+
+html.terminal-full .Root__main-view .playlist-playlist-playlistDescription {
+  color: var(--term-subdued) !important;
+}
+
+html.terminal-full .Root__main-view .playlist-playlist-playlistDescription::before {
+  content: "// ";
+  color: var(--term-border);
+}
+
+/* ---- 6. Action bar --------------------------------------------------
+   Play: `[ ▶ lire ]` — square, teal frame, inverse on hover. The native
+   icon stays (it already flips play/pause); the word comes from
+   data-tf-state, set by theme.js from the player context, with a neutral
+   "lecture" when it can't tell. Shuffle / save / download / more: framed
+   glyph buttons with a short visible label; native aria-labels and
+   tooltips are untouched. */
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow {
+  gap: 8px;
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarPlayButtonContainer {
+  box-shadow: none !important;
+}
+
+html.terminal-full .Root__main-view :is(.main-actionBar-ActionBarPlayButtonContainer button, .main-actionBar-ActionBarRow [data-testid="play-button"]) {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  inline-size: auto !important;
+  block-size: 40px !important;
+  min-inline-size: 0 !important;
+  padding: 0 14px !important;
+  background: var(--term-bg) !important;
+  border: 1px solid var(--term-green) !important;
+  color: var(--term-green) !important;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45) !important;
+  font-size: 14px !important;
+  font-weight: 700;
+  transform: none !important;
+  transition: background-color var(--tf-fast) var(--tf-ease), color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view :is(.main-actionBar-ActionBarPlayButtonContainer button, .main-actionBar-ActionBarRow [data-testid="play-button"])::before {
+  content: "[";
+}
+
+html.terminal-full .Root__main-view :is(.main-actionBar-ActionBarPlayButtonContainer button, .main-actionBar-ActionBarRow [data-testid="play-button"])::after {
+  content: "lecture ]";
+  white-space: pre;
+}
+
+html.terminal-full .Root__main-view :is(.main-actionBar-ActionBarPlayButtonContainer button, .main-actionBar-ActionBarRow [data-testid="play-button"])[data-tf-state="play"]::after {
+  content: "lire ]";
+}
+
+html.terminal-full .Root__main-view :is(.main-actionBar-ActionBarPlayButtonContainer button, .main-actionBar-ActionBarRow [data-testid="play-button"])[data-tf-state="pause"]::after {
+  content: "pause ]";
+}
+
+html.terminal-full .Root__main-view :is(.main-actionBar-ActionBarPlayButtonContainer button, .main-actionBar-ActionBarRow [data-testid="play-button"]) > span {
+  background: transparent !important;
+  color: inherit !important;
+  inline-size: auto !important;
+  block-size: auto !important;
+  min-block-size: 0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+html.terminal-full .Root__main-view :is(.main-actionBar-ActionBarPlayButtonContainer button, .main-actionBar-ActionBarRow [data-testid="play-button"]) svg {
+  inline-size: 14px !important;
+  block-size: 14px !important;
+  fill: currentColor !important;
+}
+
+html.terminal-full .Root__main-view :is(.main-actionBar-ActionBarPlayButtonContainer button, .main-actionBar-ActionBarRow [data-testid="play-button"]):hover {
+  background: var(--term-green) !important;
+  color: var(--term-bg) !important;
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-actionBar-shuffleButton,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="shuffle-button"],
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-addButton-button,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="add-button"],
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-moreButton-button,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="more-button"],
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .x-downloadButton-button,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="download-button"],
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .artist-followButton-button {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  inline-size: auto !important;
+  min-inline-size: 32px;
+  block-size: 32px !important;
+  padding: 0 10px !important;
+  background: transparent !important;
+  border: 1px solid var(--term-border) !important;
+  color: var(--term-subdued) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+  transition: border-color var(--tf-fast) var(--tf-ease), color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-actionBar-shuffleButton:hover,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="shuffle-button"]:hover,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-addButton-button:hover,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="add-button"]:hover,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-moreButton-button:hover,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="more-button"]:hover,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .x-downloadButton-button:hover,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="download-button"]:hover,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .artist-followButton-button:hover {
+  border-color: var(--term-green) !important;
+  color: var(--term-text) !important;
+}
+
+/* Glyph buttons: the Spotify icon is replaced, not kept. */
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-actionBar-shuffleButton, [data-testid="shuffle-button"], .main-addButton-button, [data-testid="add-button"], .main-moreButton-button, [data-testid="more-button"]) > * {
+  display: none !important;
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-actionBar-shuffleButton::before,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="shuffle-button"]::before {
+  content: "⤮";
+  font-size: 15px;
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-actionBar-shuffleButton::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="shuffle-button"]::after {
+  content: "aléatoire";
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-addButton-button::before,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="add-button"]::before {
+  content: "＋";
+  font-size: 14px;
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-addButton-button::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="add-button"]::after {
+  content: "enregistrer";
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-moreButton-button::before,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="more-button"]::before {
+  content: "⋯";
+  font-size: 15px;
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-moreButton-button::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="more-button"]::after {
+  content: "plus";
+}
+
+/* Download keeps its SVG (it carries the progress ring and done state);
+   the label is its own localized aria-label, clipped to stay short. */
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.x-downloadButton-button, [data-testid="download-button"]) svg {
+  inline-size: 14px !important;
+  block-size: 14px !important;
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .x-downloadButton-button[aria-label]::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="download-button"][aria-label]::after {
+  content: attr(aria-label);
+  display: inline-block;
+  max-inline-size: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: lowercase;
+}
+
+/* On states: shuffle on, saved to library, following. */
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-actionBar-shuffleButton:is([aria-checked="true"], [aria-pressed="true"], .main-addButton-active),
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="shuffle-button"]:is([aria-checked="true"], [aria-pressed="true"], .main-addButton-active),
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-addButton-button:is([aria-checked="true"], [aria-pressed="true"], .main-addButton-active),
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="add-button"]:is([aria-checked="true"], [aria-pressed="true"], .main-addButton-active),
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .artist-followButton-followed {
+  color: var(--term-green) !important;
+  border-color: var(--term-green-dim) !important;
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-addButton-button:is([aria-checked="true"], .main-addButton-active)::before,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="add-button"]:is([aria-checked="true"], .main-addButton-active)::before {
+  content: "♥\FE0E";
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-addButton-button:is([aria-checked="true"], .main-addButton-active)::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="add-button"]:is([aria-checked="true"], .main-addButton-active)::after {
+  content: "enregistré";
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-actionBar-shuffleButton:is([aria-checked="true"], [aria-pressed="true"])::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="shuffle-button"]:is([aria-checked="true"], [aria-pressed="true"])::after {
+  content: "aléatoire: on";
+}
+
+/* ---- 7. Tracklists: `ls -l` --------------------------------------------
+   Uppercase dim header row with a rule under it, mono rows with tabular
+   digits, zebra shading from the stable aria-rowindex (works with the
+   virtualized list, where nth-child does not), a lifted hover, teal ▶ +
+   teal title for the playing row (the equaliser GIF is hidden above),
+   [E] badges, ♥/＋ glyphs, and the first rows fading in one after the
+   other (max 8 rows, 20ms apart). */
+html.terminal-full .Root__main-view .main-trackList-trackListHeader,
+html.terminal-full .Root__main-view .main-trackList-trackListHeaderStuck {
+  background-color: var(--term-bg) !important;
+  box-shadow: none !important;
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListHeaderRow {
+  border-bottom: 1px solid var(--term-border) !important;
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListHeaderRow [role="columnheader"],
+html.terminal-full .Root__main-view .main-trackList-trackListHeaderRow [role="columnheader"] * {
+  text-transform: uppercase;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.08em !important;
+  color: var(--term-subdued) !important;
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListHeaderRow [role="columnheader"]:last-child svg {
+  display: none !important;
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListHeaderRow [role="columnheader"]:last-child:has(svg)::after {
+  content: "⏱\FE0E";
+  font-size: 13px;
+  color: var(--term-subdued);
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow {
+  font-variant-numeric: tabular-nums;
+  transition: background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view .main-trackList-rowMainContentTitle,
+html.terminal-full .Root__main-view .main-trackList-rowTitle {
+  font-size: 14px !important;
+  letter-spacing: 0 !important;
+}
+
+html.terminal-full .Root__main-view :is([aria-rowindex$="1"], [aria-rowindex$="3"], [aria-rowindex$="5"], [aria-rowindex$="7"], [aria-rowindex$="9"]) > .main-trackList-trackListRow {
+  background-color: var(--term-bg-tinted);
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow:hover,
+html.terminal-full .Root__main-view .main-trackList-trackListRow:focus-within {
+  background-color: color-mix(in srgb, var(--term-text) 9%, var(--term-bg)) !important;
+  box-shadow: inset 2px 0 0 var(--term-subdued) !important;
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow:hover .main-trackList-rowMainContentTitle {
+  color: var(--term-text) !important;
+}
+
+html.terminal-full .Root__main-view .main-trackList-selected.main-trackList-selected,
+html.terminal-full .Root__main-view [aria-selected="true"] > .main-trackList-trackListRow {
+  background-color: color-mix(in srgb, var(--term-green) 16%, var(--term-bg)) !important;
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow:is(.main-trackList-active, :has(.main-trackList-playingIcon)) {
+  background-color: color-mix(in srgb, var(--term-green) 9%, var(--term-bg)) !important;
+  box-shadow: inset 2px 0 0 var(--term-green) !important;
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow:is(.main-trackList-active, :has(.main-trackList-playingIcon)) .main-trackList-rowMainContentTitle,
+html.terminal-full .Root__main-view .main-trackList-trackListRow:is(.main-trackList-active, :has(.main-trackList-playingIcon)) .main-trackList-rowTitle,
+html.terminal-full .Root__main-view .main-trackList-trackListRow:is(.main-trackList-active, :has(.main-trackList-playingIcon)) .main-trackList-number {
+  color: var(--term-green) !important;
+}
+
+html.terminal-full .Root__main-view :is(.main-trackList-rowImagePlayButton, .main-trackList-rowImagePlayPauseButton, .main-trackList-rowMarker button) svg {
+  fill: var(--term-green) !important;
+  color: var(--term-green) !important;
+}
+
+/* Explicit and other row badges: plain [E] text, no filled chip. */
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-tag-container,
+html.terminal-full .Root__main-view .x-explicit-label.x-explicit-label {
+  background: transparent !important;
+  color: var(--term-subdued) !important;
+  padding: 0 !important;
+  min-inline-size: 0 !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-tag-container::before,
+html.terminal-full .Root__main-view .x-explicit-label.x-explicit-label::before {
+  content: "[";
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-tag-container::after,
+html.terminal-full .Root__main-view .x-explicit-label.x-explicit-label::after {
+  content: "]";
+}
+
+/* Row heart / add and "more": glyphs. The native button (and its
+   show-on-hover behaviour, aria-label and tooltip) is untouched. */
+html.terminal-full .Root__main-view .main-trackList-trackListRow :is(.main-trackList-rowHeartButton, .main-addButton-button, [data-testid="add-button"], .main-trackList-rowMoreButton) > * {
+  display: none !important;
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-trackList-rowHeartButton,
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-addButton-button,
+html.terminal-full .Root__main-view .main-trackList-trackListRow [data-testid="add-button"] {
+  color: var(--term-subdued) !important;
+  font-size: 14px;
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-trackList-rowHeartButton::before,
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-addButton-button::before,
+html.terminal-full .Root__main-view .main-trackList-trackListRow [data-testid="add-button"]::before {
+  content: "＋";
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-trackList-rowHeartButton:is([aria-checked="true"], .main-addButton-active),
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-addButton-button:is([aria-checked="true"], .main-addButton-active),
+html.terminal-full .Root__main-view .main-trackList-trackListRow [data-testid="add-button"]:is([aria-checked="true"], .main-addButton-active) {
+  color: var(--term-green) !important;
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-trackList-rowHeartButton:is([aria-checked="true"], .main-addButton-active)::before,
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-addButton-button:is([aria-checked="true"], .main-addButton-active)::before,
+html.terminal-full .Root__main-view .main-trackList-trackListRow [data-testid="add-button"]:is([aria-checked="true"], .main-addButton-active)::before {
+  content: "♥\FE0E";
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-trackList-rowMoreButton {
+  color: var(--term-subdued) !important;
+  font-size: 15px;
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-trackList-rowMoreButton::before {
+  content: "⋯";
+}
+
+html.terminal-full .Root__main-view :is([aria-rowindex="2"], [aria-rowindex="3"], [aria-rowindex="4"], [aria-rowindex="5"], [aria-rowindex="6"], [aria-rowindex="7"], [aria-rowindex="8"], [aria-rowindex="9"]) > .main-trackList-trackListRow {
+  animation: tf-row-in var(--tf-med) var(--tf-ease) backwards;
+}
+
+html.terminal-full .Root__main-view [aria-rowindex="3"] > .main-trackList-trackListRow { animation-delay: 20ms; }
+html.terminal-full .Root__main-view [aria-rowindex="4"] > .main-trackList-trackListRow { animation-delay: 40ms; }
+html.terminal-full .Root__main-view [aria-rowindex="5"] > .main-trackList-trackListRow { animation-delay: 60ms; }
+html.terminal-full .Root__main-view [aria-rowindex="6"] > .main-trackList-trackListRow { animation-delay: 80ms; }
+html.terminal-full .Root__main-view [aria-rowindex="7"] > .main-trackList-trackListRow { animation-delay: 100ms; }
+html.terminal-full .Root__main-view [aria-rowindex="8"] > .main-trackList-trackListRow { animation-delay: 120ms; }
+html.terminal-full .Root__main-view [aria-rowindex="9"] > .main-trackList-trackListRow { animation-delay: 140ms; }
+
+@keyframes tf-row-in {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Vim cursor (j/k): must stay the strongest row state — above hover,
+   zebra and "playing" — so the keyboard position is never ambiguous. */
+html.terminal-full .Root__main-view .main-trackList-trackListRow.terminal-vim-cursor {
+  outline: 1px solid var(--term-green) !important;
+  outline-offset: -1px;
+  background-color: color-mix(in srgb, var(--term-green) 20%, var(--term-bg)) !important;
+  box-shadow: inset 4px 0 0 var(--term-green) !important;
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow.terminal-vim-cursor .main-trackList-rowMainContentTitle {
+  color: var(--term-text) !important;
+}
+
+/* ---- 8. Collection tiles (Liked Songs / Your Episodes) ----------------
+   Spotify's own purple-gradient and green-bookmark art → neutral grey
+   tiles; the big Liked Songs hero card on /collection loses its gradient. */
+html.terminal-full .Root__main-view img:is([src*="liked-songs"], [src*="your-episodes"], [src*="yourEpisodes"]) {
+  filter: grayscale(1) brightness(0.55) contrast(1.35) !important;
+}
+
+html.terminal-full .Root__main-view .collection-collectionEntityHeroCard-likedSongs,
+html.terminal-full .Root__main-view .collection-collectionEntityHeroCard-yourEpisodes,
+html.terminal-full .Root__main-view .main-yourEpisodes-yourEpisodesCard,
+html.terminal-full .Root__main-view .main-yourEpisodes-coverContainer {
+  background: var(--term-bg-elevated) !important;
+  background-image: none !important;
+  border: 1px solid var(--term-border) !important;
+  color: var(--term-text) !important;
+}
+
+html.terminal-full .Root__main-view .main-yourEpisodes-coverIcon,
+html.terminal-full .Root__main-view .main-yourEpisodes-coverIcon svg {
+  color: var(--term-green) !important;
+  fill: var(--term-green) !important;
+}
+
+/* ---- 9. Loading skeletons: dim blinking blocks (a cursor blink, 1s
+   step-end — no shimmer gradient). */
+html.terminal-full .Root__main-view .main-card-imageContainerSkeleton,
+html.terminal-full .Root__main-view .main-trackList-placeholderStart,
+html.terminal-full .Root__main-view .main-trackList-placeholderVariable,
+html.terminal-full .Root__main-view .main-trackList-placeholderEnd,
+html.terminal-full .Root__main-view .main-trackList-placeholderIndex,
+html.terminal-full .Root__main-view .collection-collectionEntityHeroCard-skeletonRow,
+html.terminal-full .Root__main-view [data-encore-id="skeleton"] {
+  background: var(--term-border) !important;
+  background-image: none !important;
+  opacity: 0.5;
+  animation: tf-skeleton 1s step-end infinite;
+}
+
+@keyframes tf-skeleton {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.2; }
+}
+
+/* ---- 10. Settings (and any x-settings page): a config file ------------
+   `# title`, `[section]` headers, `key ...... = value` rows, toggles
+   drawn as [x] / [ ] over the native checkbox input (which still takes
+   the click and keeps its role/label). */
+html.terminal-full [data-testid="settings-page"],
+html.terminal-full .x-settings-container {
+  font-size: 13px;
+}
+
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) h1 {
+  font-size: 22px !important;
+  letter-spacing: 0 !important;
+}
+
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) h1::before {
+  content: "# ";
+  color: var(--term-green);
+}
+
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) .x-settings-section h2,
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) .x-settings-headerContainer h2,
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) .x-settings-outputSectionHeader:not(tf-nx) {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0 !important;
+  color: var(--term-green) !important;
+  margin-top: 20px;
+}
+
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) .x-settings-section h2::before,
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) .x-settings-headerContainer h2::before,
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) .x-settings-outputSectionHeader:not(tf-nx)::before {
+  content: "[";
+}
+
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) .x-settings-section h2::after,
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) .x-settings-headerContainer h2::after,
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) .x-settings-outputSectionHeader:not(tf-nx)::after {
+  content: "]";
+}
+
+html.terminal-full .x-settings-row {
+  border-bottom: 1px dashed var(--term-border);
+  padding-block: 4px;
+  min-block-size: 40px;
+  transition: background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .x-settings-row:hover {
+  background-color: var(--term-bg-tinted);
+}
+
+html.terminal-full .x-settings-firstColumn,
+html.terminal-full .x-settings-firstColumn * {
+  color: var(--term-text) !important;
+  font-size: 13px !important;
+}
+
+html.terminal-full .x-settings-secondColumn::before {
+  content: "=";
+  margin-inline-end: 10px;
+  color: var(--term-subdued);
+}
+
+html.terminal-full .x-settings-secondColumn {
+  display: flex;
+  align-items: center;
+}
+
+html.terminal-full .x-settings-container :is(select, input[type="text"], input[type="number"], input:not([type]), textarea),
+html.terminal-full [data-testid="settings-page"] :is(select, input[type="text"], input[type="number"], input:not([type]), textarea) {
+  background-color: var(--term-bg-elevated) !important;
+  border: 1px solid var(--term-border) !important;
+  color: var(--term-text) !important;
+  box-shadow: none !important;
+  min-block-size: 32px;
+}
+
+html.terminal-full .x-settings-container select:focus-visible,
+html.terminal-full .x-settings-container input:focus-visible,
+html.terminal-full .x-settings-container textarea:focus-visible,
+html.terminal-full [data-testid="settings-page"] select:focus-visible,
+html.terminal-full [data-testid="settings-page"] input:focus-visible,
+html.terminal-full [data-testid="settings-page"] textarea:focus-visible {
+  border-color: var(--term-green) !important;
+}
+
+html.terminal-full .x-toggle-wrapper {
+  min-block-size: 32px;
+  min-inline-size: 44px;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+html.terminal-full .x-toggle-indicatorWrapper {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  inline-size: auto !important;
+  block-size: auto !important;
+  display: inline-flex !important;
+  align-items: center;
+}
+
+html.terminal-full .x-toggle-indicator {
+  display: none !important;
+}
+
+html.terminal-full .x-toggle-indicatorWrapper::before {
+  content: "[ ]";
+  white-space: pre;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--term-subdued);
+  transition: color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .x-toggle-input:checked + .x-toggle-indicatorWrapper::before,
+html.terminal-full .x-toggle-input:checked ~ .x-toggle-indicatorWrapper::before {
+  content: "[x]";
+  color: var(--term-green);
+}
+
+html.terminal-full .x-toggle-wrapper:hover .x-toggle-indicatorWrapper::before {
+  color: var(--term-text);
+}
+
+html.terminal-full .x-toggle-input:checked + .x-toggle-indicatorWrapper:hover::before,
+html.terminal-full .x-toggle-wrapper:hover .x-toggle-input:checked ~ .x-toggle-indicatorWrapper::before {
+  color: var(--term-green);
+}
+
+html.terminal-full .x-toggle-input:disabled ~ .x-toggle-indicatorWrapper::before {
+  opacity: 0.4;
+}
+
+html.terminal-full .x-toggle-input:focus-visible ~ .x-toggle-indicatorWrapper {
+  outline: 2px solid var(--term-green);
+  outline-offset: 2px;
+}
+
+/* The equalizer canvas is drawn in Spotify green by Spotify's own code; a
+   hue shift is the only lever (Comfy does the same). */
+html.terminal-full .x-settings-equalizerPanelCanvas {
+  filter: hue-rotate(28deg) saturate(0.6);
+}
+
+/* Reduced motion: the global rule already shortens every animation; our
+   own ones are switched off outright so nothing even flickers. */
+@media (prefers-reduced-motion: reduce) {
+  html.terminal-full .Root__main-view .main-card-card .main-card-imageContainer::after,
+html.terminal-full .Root__main-view .main-entityHeader-title::after,
+html.terminal-full .Root__main-view .main-trackList-trackListRow,
+html.terminal-full .Root__main-view .main-card-imageContainerSkeleton,
+html.terminal-full .Root__main-view .main-trackList-placeholderStart,
+html.terminal-full .Root__main-view .main-trackList-placeholderVariable,
+html.terminal-full .Root__main-view .main-trackList-placeholderEnd,
+html.terminal-full .Root__main-view .main-trackList-placeholderIndex,
+html.terminal-full .Root__main-view .collection-collectionEntityHeroCard-skeletonRow,
+html.terminal-full .Root__main-view [data-encore-id="skeleton"] {
+    animation: none !important;
+  }
+}
+/* --- END FULL/PAGES ------------------------------------------------------ */
+
+/* --- FULL/CHROME (agent D) ----------------------------------------------- */
+/* Overlays (context menus, tooltips, dialogs, toasts, the settings window)
+   drawn as terminal windows, plus Spotify branding removal. theme.js also
+   sets html[data-tf-page] = home | search | playlist | album | artist |
+   show | episode | collection | lyrics | queue | settings | profile | other
+   (see the FULL/CHROME section there) for page-specific rules. */
+
+/* ---- Context menus: a dropdown window with a title strip ---------------- */
+html.terminal-full .main-contextMenu-menu {
+  border-radius: 0 !important;
+  border: 1px solid var(--term-green) !important;
+  background: var(--term-bg-elevated) !important;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45) !important;
+  padding: 0 0 4px !important;
+  font-family: var(--term-font) !important;
+  font-size: 12.5px;
+  transform-origin: top left;
+  animation: tf-menu-in var(--tf-med) var(--tf-ease) both;
+}
+
+@keyframes tf-menu-in {
+  from { opacity: 0; transform: translateY(-4px) scaleY(0.96); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Title strip "┌─ menu ───…". Sticky so it stays put while a long menu
+   (add to playlist) scrolls under it; the long run of ─ is clipped by
+   overflow, so it always reaches the right edge whatever the width. */
+html.terminal-full .main-contextMenu-menu::before {
+  content: "┌─ menu ──────────────────────────────────────────────────────────────────────────";
+  display: block;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: var(--tf-title-h);
+  line-height: var(--tf-title-h);
+  padding: 0 8px;
+  margin-bottom: 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  background: var(--term-bg-elevated-hi);
+  border-bottom: 1px solid var(--term-border);
+  color: var(--term-subdued);
+  font-size: 11px;
+}
+
+html.terminal-full .main-contextMenu-menuItemButton {
+  border-radius: 0 !important;
+  min-height: 32px;
+  padding-left: 24px !important;
+  font-family: var(--term-font) !important;
+}
+
+html.terminal-full .main-contextMenu-menuItemLabel,
+html.terminal-full .main-contextMenu-menuHeading {
+  font-family: var(--term-font) !important;
+  font-weight: 400 !important;
+  letter-spacing: 0 !important;
+}
+
+html.terminal-full .main-contextMenu-menuHeading {
+  color: var(--term-subdued) !important;
+  font-size: 11px !important;
+  text-transform: lowercase;
+}
+
+html.terminal-full .main-contextMenu-menuHeading::before {
+  content: "# ";
+  color: var(--term-green-dim);
+}
+
+/* The › prompt is always there (dim), and lights up on the active row —
+   hover or keyboard focus alike, so arrow-key navigation reads the same. */
+html.terminal-full .main-contextMenu-menuItemButton::before {
+  left: 9px;
+  opacity: 0.35;
+  color: var(--term-subdued);
+  transition: opacity var(--tf-fast) var(--tf-ease), color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .main-contextMenu-menuItemButton:is(:hover, :focus, :focus-visible)::before,
+html.terminal-full .main-contextMenu-menuItemButton[aria-expanded="true"]::before {
+  opacity: 1;
+  color: var(--term-green);
+}
+
+html.terminal-full .main-contextMenu-menuItemButton:is(:hover, :focus, :focus-visible),
+html.terminal-full .main-contextMenu-menuItemButton[aria-expanded="true"] {
+  background-color: rgba(94, 189, 171, 0.16) !important;
+  color: var(--term-text) !important;
+  outline: none;
+  box-shadow: inset 2px 0 0 var(--term-green);
+}
+
+html.terminal-full .main-contextMenu-menuItemButton[aria-disabled="true"],
+html.terminal-full .main-contextMenu-menuItemButtonDisabled {
+  opacity: 0.45;
+}
+
+/* Submenus: the chevron svg becomes a ▸ glyph. */
+html.terminal-full .main-contextMenu-subMenuIcon {
+  display: none !important;
+}
+
+html.terminal-full .main-contextMenu-menuItemButton:has(.main-contextMenu-subMenuIcon)::after {
+  content: "▸";
+  margin-left: auto;
+  padding-left: 12px;
+  color: var(--term-subdued);
+}
+
+html.terminal-full .main-contextMenu-menuItemButton[aria-expanded="true"]:has(.main-contextMenu-subMenuIcon)::after {
+  color: var(--term-green);
+}
+
+/* Dividers as a box-drawing rule "├────…". Spotify draws them with a
+   pseudo-element or a border depending on the build, so both are reset
+   and the line is drawn in-flow (never absolutely over an item). */
+html.terminal-full .main-contextMenu-dividerAfter,
+html.terminal-full .main-contextMenu-dividerBefore {
+  border: 0 !important;
+}
+
+html.terminal-full .main-contextMenu-dividerAfter::after,
+html.terminal-full .main-contextMenu-dividerBefore::before {
+  content: "├──────────────────────────────────────────────────────────────────────────────" !important;
+  display: block !important;
+  position: static !important;
+  height: 12px !important;
+  line-height: 12px !important;
+  margin: 2px 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: none !important;
+  overflow: hidden;
+  white-space: nowrap;
+  font-family: var(--term-font);
+  font-size: 12px;
+  color: var(--term-subdued);
+  opacity: 0.5;
+}
+
+/* Filter box in "add to playlist" etc. */
+html.terminal-full .main-contextMenu-filterInputContainer,
+html.terminal-full .main-contextMenu-filterInput {
+  border-radius: 0 !important;
+  font-family: var(--term-font) !important;
+}
+
+/* Rows fade in one after the other (first 8 only, 20ms apart). */
+html.terminal-full .main-contextMenu-menu > li {
+  animation: tf-menu-row-in var(--tf-med) var(--tf-ease) backwards;
+}
+html.terminal-full .main-contextMenu-menu > li:nth-child(2) { animation-delay: 20ms; }
+html.terminal-full .main-contextMenu-menu > li:nth-child(3) { animation-delay: 40ms; }
+html.terminal-full .main-contextMenu-menu > li:nth-child(4) { animation-delay: 60ms; }
+html.terminal-full .main-contextMenu-menu > li:nth-child(5) { animation-delay: 80ms; }
+html.terminal-full .main-contextMenu-menu > li:nth-child(6) { animation-delay: 100ms; }
+html.terminal-full .main-contextMenu-menu > li:nth-child(7) { animation-delay: 120ms; }
+html.terminal-full .main-contextMenu-menu > li:nth-child(n + 8) { animation-delay: 140ms; }
+
+@keyframes tf-menu-row-in {
+  from { opacity: 0; transform: translateX(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---- Tooltips: a one-line hint box -------------------------------------- */
+html.terminal-full [role="tooltip"],
+html.terminal-full .tippy-box:not(:has([role="menu"], [role="tooltip"])),
+html.terminal-full .main-contextMenu-tippy:not(:has([role="menu"], [role="tooltip"])) {
+  border-radius: 0 !important;
+  border: 1px solid var(--term-green-dim) !important;
+  background: var(--term-bg-elevated-hi) !important;
+  color: var(--term-text) !important;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45) !important;
+  font-family: var(--term-font) !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  line-height: 1.4 !important;
+  padding: 4px 8px !important;
+  animation: tf-tip-in var(--tf-fast) var(--tf-ease) both;
+}
+
+html.terminal-full [role="tooltip"]::before,
+html.terminal-full .main-contextMenu-tippy:not(:has([role="menu"], [role="tooltip"]))::before {
+  content: "› ";
+  color: var(--term-green);
+}
+
+@keyframes tf-tip-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---- Dialogs: a framed window with a title bar -------------------------- */
+html.terminal-full .GenericModal__overlay {
+  background: rgba(0, 0, 0, 0.72) !important;
+}
+
+html.terminal-full dialog::backdrop {
+  background: rgba(0, 0, 0, 0.72);
+}
+
+html.terminal-full .GenericModal,
+html.terminal-full [role="dialog"][aria-modal="true"],
+html.terminal-full .main-confirmDialog-container,
+html.terminal-full .desktopmodals-aboutSpotifyModal-container,
+html.terminal-full .desktopmodals-licensesModal-container,
+html.terminal-full .desktopmodals-versionStatus-container {
+  border-radius: 0 !important;
+  font-family: var(--term-font) !important;
+}
+
+/* Square everything inside a dialog: buttons, inputs, images, toggles. */
+html.terminal-full .GenericModal *,
+html.terminal-full [role="dialog"][aria-modal="true"] *,
+html.terminal-full .main-confirmDialog-container * {
+  border-radius: 0 !important;
+}
+
+html.terminal-full [role="dialog"][aria-modal="true"] h1,
+html.terminal-full [role="dialog"][aria-modal="true"] h2,
+html.terminal-full [role="dialog"][aria-modal="true"] h3,
+html.terminal-full [role="dialog"][aria-modal="true"] p,
+html.terminal-full [role="dialog"][aria-modal="true"] span,
+html.terminal-full [role="dialog"][aria-modal="true"] button,
+html.terminal-full [role="dialog"][aria-modal="true"] input,
+html.terminal-full [role="dialog"][aria-modal="true"] label,
+html.terminal-full [role="dialog"][aria-modal="true"] textarea {
+  font-family: var(--term-font) !important;
+}
+
+/* The window frame: 1px green border, hard shadow, and a title bar drawn
+   from the dialog's own aria-label ("┌─ Edit details"). The bar is
+   absolutely placed inside a reserved padding band, so it never joins
+   the dialog's own flex layout. */
+html.terminal-full .GenericModal {
+  position: relative;
+  padding-top: var(--tf-title-h) !important;
+  border: 1px solid var(--term-green) !important;
+  background: var(--term-bg-elevated) !important;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45) !important;
+  animation: tf-win-in var(--tf-med) var(--tf-ease) both;
+}
+
+html.terminal-full .GenericModal::before {
+  content: "┌─ " attr(aria-label) " ──────────────────────────────────────────────────────────────────────────────";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  height: var(--tf-title-h);
+  line-height: var(--tf-title-h);
+  padding: 0 10px;
+  overflow: hidden;
+  white-space: nowrap;
+  background: var(--term-bg-elevated-hi);
+  border-bottom: 1px solid var(--term-border);
+  color: var(--term-green);
+  font-family: var(--term-font);
+  font-size: 11.5px;
+  pointer-events: none;
+}
+
+@keyframes tf-win-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Spicetify's PopupModal (our settings, other extensions' popups) has a
+   real header: that header IS the title bar, so the generic strip goes. */
+html.terminal-full .GenericModal.spicetify-popup {
+  padding-top: 0 !important;
+}
+
+html.terminal-full .GenericModal.spicetify-popup::before {
+  content: none;
+}
+
+html.terminal-full .spicetify-popup-container {
+  border-radius: 0 !important;
+  background: var(--term-bg-elevated) !important;
+}
+
+html.terminal-full .spicetify-popup-header {
+  gap: 0 !important;
+  height: 36px;
+  padding: 0 0 0 12px !important;
+  background: var(--term-bg-elevated-hi);
+  border-bottom: 1px solid var(--term-border);
+}
+
+html.terminal-full .spicetify-popup-title {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-family: var(--term-font) !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  line-height: 36px !important;
+  color: var(--term-green) !important;
+}
+
+/* white-space: pre — these are flex items, which would otherwise drop the
+   spaces around the title ("┌─~/.terminalrc─"). */
+html.terminal-full .spicetify-popup-title::before {
+  content: "┌─ ";
+  white-space: pre;
+  flex: none;
+  color: var(--term-subdued);
+  font-weight: 400;
+}
+
+html.terminal-full .spicetify-popup-title::after {
+  content: " ──────────────────────────────────────────────────────────────────────────────";
+  white-space: pre;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--term-subdued);
+  font-weight: 400;
+}
+
+/* Close: the ✕ glyph in a square 36px cell; the svg (and its "Close"
+   aria-label on the button) stay for screen readers. */
+html.terminal-full .spicetify-popup-closeBtn,
+html.terminal-full .main-trackCreditsModal-closeBtn {
+  width: 36px !important;
+  height: 36px !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  border-left: 1px solid var(--term-border) !important;
+  color: var(--term-subdued) !important;
+  transition: background-color var(--tf-fast) var(--tf-ease), color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .spicetify-popup-closeBtn svg {
+  display: none;
+}
+
+html.terminal-full .spicetify-popup-closeBtn::before {
+  content: "✕";
+  font-family: var(--term-font);
+  font-size: 15px;
+  line-height: 1;
+}
+
+html.terminal-full .spicetify-popup-closeBtn:hover,
+html.terminal-full .main-trackCreditsModal-closeBtn:hover {
+  background: var(--term-red) !important;
+  color: var(--term-text) !important;
+}
+
+html.terminal-full .spicetify-popup-closeBtn:focus-visible {
+  outline: 1px solid var(--term-green) !important;
+  outline-offset: -3px !important;
+}
+
+html.terminal-full .spicetify-popup-content {
+  padding: 12px 16px 16px !important;
+}
+
+/* ---- Toasts: log lines, bottom-left ------------------------------------- */
+html.terminal-full .notistack-SnackbarContainer {
+  left: 16px !important;
+  right: auto !important;
+  bottom: calc(var(--now-playing-bar-height, 72px) + 12px) !important;
+  transform: none !important;
+  align-items: flex-start !important;
+}
+
+html.terminal-full .notistack-Snackbar > div,
+html.terminal-full .notistack-MuiContent {
+  display: flex !important;
+  align-items: center;
+  min-width: 0 !important;
+  min-height: 32px;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 6px 12px !important;
+  border-radius: 0 !important;
+  border: 1px solid var(--term-border) !important;
+  border-left: 2px solid var(--term-green) !important;
+  background: var(--term-bg-elevated) !important;
+  color: var(--term-text) !important;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45) !important;
+  font-family: var(--term-font) !important;
+  font-size: 12.5px !important;
+  font-weight: 400 !important;
+  animation: tf-log-in var(--tf-med) var(--tf-ease) both;
+}
+
+html.terminal-full .notistack-Snackbar > div *,
+html.terminal-full .notistack-MuiContent * {
+  font-family: var(--term-font) !important;
+  border-radius: 0 !important;
+}
+
+html.terminal-full .notistack-Snackbar > div::before,
+html.terminal-full .notistack-MuiContent::before {
+  content: "[ok]";
+  flex: none;
+  margin-right: 10px;
+  color: var(--term-green);
+  font-weight: 700;
+}
+
+/* Variants need to outrank ".notistack-Snackbar > div" above, hence the
+   repeated class / div qualifiers. */
+html.terminal-full .notistack-Snackbar > div.notistack-MuiContent-warning::before,
+html.terminal-full .notistack-MuiContent.notistack-MuiContent-warning::before {
+  content: "[warn]";
+  color: var(--term-orange);
+}
+
+html.terminal-full .notistack-Snackbar > div.notistack-MuiContent-warning,
+html.terminal-full .notistack-MuiContent.notistack-MuiContent-warning {
+  border-left-color: var(--term-orange) !important;
+}
+
+html.terminal-full .notistack-Snackbar > div.notistack-MuiContent-error,
+html.terminal-full .notistack-MuiContent.notistack-MuiContent-error,
+html.terminal-full .notistack-Snackbar > div[role="alert"]:not(.notistack-MuiContent) {
+  border-left-color: var(--term-red) !important;
+}
+
+html.terminal-full .notistack-Snackbar > div.notistack-MuiContent-error::before,
+html.terminal-full .notistack-MuiContent.notistack-MuiContent-error::before,
+html.terminal-full .notistack-Snackbar > div[role="alert"]:not(.notistack-MuiContent)::before {
+  content: "[err]";
+  color: var(--term-red);
+}
+
+@keyframes tf-log-in {
+  from { opacity: 0; transform: translateX(-16px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---- Branding: logos, footer, upsells (hidden, never removed) ----------- */
+/* Logos: the app-shell skeleton logo (shows before the UI mounts), the
+   legacy sidebar wordmark, and any svg/link labelled "Spotify". */
+html.terminal-full .main-appShell-logo,
+html.terminal-full .main-navBar-logo,
+html.terminal-full .premiumSpotifyIcon,
+html.terminal-full svg[aria-label="Spotify"],
+html.terminal-full [role="img"][aria-label="Spotify"],
+html.terminal-full .desktopmodals-aboutSpotifyModal-container svg,
+html.terminal-full .desktopmodals-aboutSpotifyModal-copyright {
+  visibility: hidden !important;
+}
+
+html.terminal-full a[aria-label="Spotify"] {
+  display: none !important;
+}
+
+/* Premium upsells: buttons, nav items and menu entries (the whole <li>,
+   so no empty row is left in the menu). Hiding only — nothing here
+   touches ads, playback or any paid feature. */
+html.terminal-full .main-topBar-UpgradeButton,
+html.terminal-full .upgrade-button,
+html.terminal-full [data-testid="upgrade-button"],
+html.terminal-full [data-menu-item="upgrade-account"],
+html.terminal-full #upgradeAccount,
+html.terminal-full a[href*="spotify.com/premium"],
+html.terminal-full .main-navBar-premiumLink,
+html.terminal-full .main-navBar-premiumNavItem,
+html.terminal-full .main-contextMenu-menuItem:has(> [data-menu-item="upgrade-account"], > #upgradeAccount, > a[href*="spotify.com/premium"]),
+html.terminal-full [role="menu"] > li:has(> [data-menu-item="upgrade-account"], > #upgradeAccount, > a[href*="spotify.com/premium"]) {
+  display: none !important;
+}
+
+/* ---- Settings window (~/.terminalrc) ------------------------------------ */
+html.terminal-full .spicetify-popup:has(.terminal-settings) .spicetify-popup-container {
+  width: 560px;
+}
+
+html.terminal-full .terminal-settings {
+  min-width: 0;
+  font-size: 12.5px;
+}
+
+html.terminal-full .terminal-settings-row {
+  gap: 4px 10px;
+  min-height: 36px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--term-border);
+  transition: background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .terminal-settings-row:hover,
+html.terminal-full .terminal-settings-row:focus-within {
+  background: rgba(94, 189, 171, 0.1);
+  box-shadow: inset 2px 0 0 var(--term-green);
+}
+
+html.terminal-full .terminal-settings-row > label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 260px;
+  min-height: 36px;
+  cursor: pointer;
+}
+
+/* The mode row comes first (registry order): framed so the way back to
+   the native look is the most visible thing in the window. */
+html.terminal-full .terminal-settings-row:first-child {
+  margin-bottom: 8px;
+  border: 1px solid var(--term-green-dim);
+  background: var(--term-bg-tinted);
+}
+
+html.terminal-full .terminal-settings-row:first-child > label {
+  color: var(--term-green);
+  font-weight: 700;
+}
+
+/* Checkboxes as [x] / [ ]: same real <input>, same click target, same
+   keyboard behaviour — only its painting changes. */
+html.terminal-full .terminal-settings-row input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  width: auto;
+  height: auto;
+  margin: 0;
+  border: 0;
+  background: none;
+  font-family: var(--term-font);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--term-subdued);
+  cursor: pointer;
+}
+
+html.terminal-full .terminal-settings-row input[type="checkbox"]::before {
+  content: "[ ]";
+  white-space: pre;
+}
+
+html.terminal-full .terminal-settings-row input[type="checkbox"]:checked::before {
+  content: "[x]";
+  color: var(--term-green);
+}
+
+html.terminal-full .terminal-settings-row input[type="checkbox"]:focus-visible {
+  outline: 1px solid var(--term-green);
+  outline-offset: 2px;
+}
+
+html.terminal-full .terminal-settings-delay {
+  border-radius: 0;
+  height: 26px;
+}
+
+html.terminal-full .terminal-settings-delay:focus-visible {
+  outline: 1px solid var(--term-green);
+  outline-offset: 0;
+  border-color: var(--term-green);
+}
+
+html.terminal-full .terminal-settings-delay-group {
+  margin-left: 34px;
+}
+
+html.terminal-full .terminal-settings-hint::before {
+  content: "# ";
+  color: var(--term-green-dim);
+}
+
+html.terminal-full .terminal-settings::after {
+  content: "# ctrl+maj+alt+n : basculer terminal complet / natif · ctrl+maj+k : palette";
+  display: block;
+  margin-top: 6px;
+  color: var(--term-subdued);
+  font-size: 11px;
+}
+
+html.terminal-full.terminal-os-mac .terminal-settings::after {
+  content: "# cmd+maj+alt+n : basculer terminal complet / natif · cmd+maj+k : palette";
+}
+
+/* ==========================================================================
+   Overlap guard (after the code review of the first real-client test).
+   Word labels injected into Spotify's own buttons ("enregistrer", "lyrics",
+   "vol", "✱ news"…) assume the native button can grow to fit them; on the
+   real client several of those buttons have a fixed width, so the words
+   spilled over their neighbours and read as superimposed text. Buttons
+   keep their glyph and Spotify's own tooltip / aria-label (hover shows
+   what they do); only the extra words go. Placed last so it wins.
+   ========================================================================== */
+html.terminal-full .Root__globalNav .main-topBar-whatsNewFeed::before { content: "✱" !important; }
+html.terminal-full .Root__globalNav .main-topBar-buddyFeed::before,
+html.terminal-full .Root__globalNav .main-globalNav-buddyFeed::before { content: "☺" !important; }
+html.terminal-full .main-yourLibraryX-collapseButton::after { content: none !important; }
+html.terminal-full .main-nowPlayingBar-left::before { content: none !important; display: none !important; }
+html.terminal-full .main-nowPlayingBar-left { padding-left: 12px !important; }
+html.terminal-full [data-testid="volume-bar-toggle-mute-button"]::before { content: none !important; }
+html.terminal-full .npv-exitFullScreenButton-button::before { content: "✕" !important; }
+html.terminal-full .Root__main-view .x-categoryCard-CategoryCard::after,
+html.terminal-full .Root__main-view [class*="heroCategoryCard-HeroCategoryCard"]::after { content: none !important; }
+html.terminal-full .Root__main-view :is(.main-actionBar-ActionBarPlayButtonContainer button, .main-actionBar-ActionBarRow [data-testid="play-button"])::after,
+html.terminal-full .Root__main-view :is(.main-actionBar-ActionBarPlayButtonContainer button, .main-actionBar-ActionBarRow [data-testid="play-button"])[data-tf-state]::after {
+  content: "]" !important;
+}
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-actionBar-shuffleButton::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="shuffle-button"]::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-addButton-button::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="add-button"]::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-moreButton-button::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="more-button"]::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .x-downloadButton-button::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="download-button"]::after {
+  content: none !important;
+}
+html.terminal-full [data-testid="control-button-npv"]::after,
+html.terminal-full [data-testid="lyrics-button"]::after,
+html.terminal-full [data-testid="control-button-queue"]::after,
+html.terminal-full [data-testid="pip-toggle-button"]::after,
+html.terminal-full [data-testid="fullscreen-mode-button"]::after,
+html.terminal-full .main-nowPlayingBar-extraControls .main-devicePicker-controlButton:not(tf-nx)::after,
+html.terminal-full .main-nowPlayingBar-extraControls button[aria-describedby*="connect"]::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Fixes from the first real-client screenshot (Windows). */
+
+/* "⌂ ~" was matched by several top-bar buttons (the selector list for the
+   home button is too broad on the real markup), giving four home keys.
+   Native icons come back; only the square frame stays. */
+html.terminal-full :is(.main-globalNav-searchContainer > button, [data-testid="home-button"], .Root__globalNav .main-globalNav-navLink)::before {
+  content: none !important;
+}
+html.terminal-full :is(.main-globalNav-searchContainer > button, [data-testid="home-button"], .Root__globalNav .main-globalNav-navLink) svg {
+  display: revert !important;
+}
+
+/* "— — artist": the artists element is nested in itself on the real
+   client, so the dash was drawn twice. Only the outer one keeps it. */
+html.terminal-full .main-nowPlayingWidget-trackInfo .main-trackInfo-artists .main-trackInfo-artists::before {
+  content: none !important;
+}
+
+/* "0:392:43": moving the time labels after the bar with `order` collided
+   with the real layout. Native placement (elapsed left, total right of
+   the bar) is kept; only the typography stays. */
+html.terminal-full .playback-bar .playback-bar__progress-time-elapsed,
+html.terminal-full .playback-bar [data-testid="playback-position"],
+html.terminal-full .playback-bar .main-playbackBarRemainingTime-container,
+html.terminal-full .playback-bar [data-testid="playback-duration"] {
+  order: 0 !important;
+  margin-left: 0 !important;
+  min-width: 40px !important;
+}
+html.terminal-full .playback-bar .playback-bar__progress-time-elapsed,
+html.terminal-full .playback-bar [data-testid="playback-position"] {
+  text-align: right !important;
+}
+html.terminal-full .playback-bar .main-playbackBarRemainingTime-container::before,
+html.terminal-full .playback-bar [data-testid="playback-duration"]::before {
+  content: none !important;
+}
+
+/* Search: the native magnifier lives inside a button on the real client,
+   so it was never hidden and our ⌕ glyph was drawn over it. Keep native. */
+html.terminal-full .main-globalNav-searchInputContainer:has(input)::before {
+  content: none !important;
+}
+html.terminal-full .main-globalNav-searchInputContainer:has(input) svg:not(button svg) {
+  display: revert !important;
+}
+
+/* Smoothness in full mode (real client felt sluggish):
+   - CRT scanlines: drop the full-window multiply blend (re-blended every
+     frame under any animation) and the permanent sweep; the static lines
+     stay as a plain translucent layer the compositor draws once.
+   - Now-playing glow: a 16px blur animated forever repaints every frame;
+     the status line already carries the pulse as a 1px top line.
+   - Page transitions: no blur filter on the whole main view. */
+html.terminal-full.terminal-crt-enabled::after {
+  mix-blend-mode: normal !important;
+}
+html.terminal-full.terminal-crt-enabled::before {
+  animation: none !important;
+  display: none !important;
+}
+html.terminal-full .main-nowPlayingWidget-coverArt::after {
+  animation: none !important;
+  filter: none !important;
+  display: none !important;
+}
+html.terminal-full .terminal-view-enter {
+  animation: tf-view-in var(--tf-med, 200ms) var(--tf-ease, ease-out) !important;
+}
+@keyframes tf-view-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Fixes from the second real-client screenshot (Liked Songs, Windows). */
+
+/* Header / action-bar colour wash: the real client paints it through an
+   inline background-color on wrappers whose classes don't all contain
+   "entityHeader", so the purple survived. Any inline background colour in
+   the main view is flattened, except genre tiles (they keep their colour
+   as the left bar) and images. */
+html.terminal-full .Root__main-view :is(
+  .main-entityHeader-background,
+  .main-entityHeader-backgroundColor,
+  .main-entityHeader-overlay,
+  .main-actionBarBackground-background,
+  [style*="background-color"]:not(img):not([class*="CategoryCard"]):not([class*="categoryCard"])
+) {
+  background-color: var(--term-bg) !important;
+  background-image: none !important;
+}
+html.terminal-full .Root__main-view [style*="--background-color"],
+html.terminal-full .Root__main-view [style*="--bgColor"] {
+  --background-color: var(--term-bg) !important;
+  --bgColor: var(--term-bg) !important;
+}
+
+/* Thin rule crossing the header (and the cover) under the sticky top bar. */
+html.terminal-full .main-topBar-container {
+  border-bottom: 0 !important;
+}
+
+/* "Plavlist": the pretitle's line box clipped descenders. */
+html.terminal-full .Root__main-view .main-entityHeader-pretitle,
+html.terminal-full .Root__main-view .main-entityHeader-pretitle * {
+  line-height: 1.4 !important;
+  overflow: visible !important;
+}
+
+/* "☻🔔" / "☻👥": our glyph was added next to Spotify's own icon. */
+html.terminal-full .Root__globalNav .main-topBar-whatsNewFeed::before,
+html.terminal-full .Root__globalNav .main-topBar-buddyFeed::before,
+html.terminal-full .Root__globalNav .main-globalNav-buddyFeed::before {
+  content: none !important;
+}
+
+/* "2:3]8": the seek bar's closing bracket landed on the duration. */
+html.terminal-full .playback-bar [data-testid="progress-bar"]::before,
+html.terminal-full .playback-bar [data-testid="progress-bar"]::after {
+  content: none !important;
+}
+
+/* Inverted sets (Marketplace install button, carousel arrows) were bright
+   white blocks; they become terminal keys: elevated surface, green text. */
+html.terminal-full .encore-inverted-light-set,
+html.terminal-full .encore-dark-theme .encore-inverted-light-set {
+  --background-base: var(--term-bg-elevated-hi) !important;
+  --background-highlight: var(--term-green-dim) !important;
+  --background-press: var(--term-bg-press) !important;
+  --text-base: var(--term-green) !important;
+  --text-subdued: var(--term-subdued) !important;
+  --essential-base: var(--term-green) !important;
+  --essential-subdued: var(--term-subdued) !important;
+}
+
+/* Fixes from the third real-client screenshot. */
+
+/* "sep: •" rows: the separator pieces were hidden by a rule that lost on
+   specificity to the one laying the tagged pieces out. */
+html.terminal-full .Root__main-view .main-entityHeader-metaData[data-tf-meta] [data-tf-key="sep"],
+html.terminal-full .Root__main-view .main-entityHeader-metaData[data-tf-meta] > * > [data-tf-key="sep"] {
+  display: none !important;
+}
+
+/* "Plavlist": descenders of the small line above the title were clipped. */
+html.terminal-full .Root__main-view .main-entityHeader-headerText > span:first-child,
+html.terminal-full .Root__main-view .main-entityHeader-headerText > div:first-child,
+html.terminal-full .Root__main-view .main-entityHeader-headerTextSection > span:first-child,
+html.terminal-full .Root__main-view .main-entityHeader-headerTextSection > div:first-child,
+html.terminal-full .Root__main-view .main-entityHeader-headerTextSection > div:first-child > span,
+html.terminal-full .Root__main-view .main-entityHeader-pretitle {
+  line-height: 1.5 !important;
+  overflow: visible !important;
+  padding-bottom: 1px;
+}
+
+/* Transport glyphs (↻ sat low in the active repeat key): the glyph is laid
+   over the whole button and centred, whatever Spotify keeps inside it. */
+html.terminal-full [data-testid="control-button-shuffle"],
+html.terminal-full [data-testid="control-button-skip-back"],
+html.terminal-full [data-testid="control-button-skip-forward"],
+html.terminal-full [data-testid="control-button-repeat"] {
+  position: relative !important;
+}
+html.terminal-full :is(
+  [data-testid="control-button-shuffle"],
+  [data-testid="control-button-skip-back"],
+  [data-testid="control-button-skip-forward"],
+  [data-testid="control-button-repeat"]
+) > * {
+  visibility: hidden !important;
+}
+html.terminal-full [data-testid="control-button-shuffle"]::before,
+html.terminal-full [data-testid="control-button-skip-back"]::before,
+html.terminal-full [data-testid="control-button-skip-forward"]::before,
+html.terminal-full [data-testid="control-button-repeat"]::before {
+  position: absolute !important;
+  inset: 0;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  line-height: 1 !important;
+}
+
+/* Cover was flush against the window edge. */
+html.terminal-full .Root__now-playing-bar [data-testid="now-playing-widget"] {
+  margin-left: 12px !important;
+}
+
+/* Empty frame before the bell: the news / friends wrappers were framed
+   as keys around Spotify's own framed button. Only the buttons keep one. */
+html.terminal-full .Root__globalNav .main-topBar-whatsNewFeed:not(button),
+html.terminal-full .Root__globalNav .main-topBar-buddyFeed:not(button),
+html.terminal-full .Root__globalNav .main-globalNav-buddyFeed:not(button) {
+  border-color: transparent !important;
+  background: transparent !important;
+  padding: 0 !important;
+  min-width: 0 !important;
+}
+
+/* Perpetual opacity "breathing" on the status line and cover frame: kept
+   the compositor busy for a 1px line; the tint stays, static. */
+html.terminal-full .Root__now-playing-bar::before,
+html.terminal-full .main-nowPlayingWidget-coverArt::after {
+  animation: none !important;
+  opacity: 0.8;
+}
+
+/* CRT scanlines in full mode: a full-window layer above everything makes
+   the GPU re-blend the whole window on every visible change (scrolling,
+   progress bar, hover), which integrated GPUs feel as input latency. The
+   terminal look carries itself without it in this mode; the setting still
+   works in the classic mode. */
+html.terminal-full.terminal-crt-enabled::after,
+html.terminal-full.terminal-crt-enabled::before {
+  content: none !important;
+  display: none !important;
+}
+
+/* Instant response (menus felt laggy on click): anything that opens from a
+   click — context menus and their items, dropdowns, tooltips, dialogs,
+   popups — appears on the very next frame, like a terminal. The v1.2 menu
+   "bounce" (220 ms), the 200 ms fade and the 20 ms-per-item stagger meant
+   the last menu item was readable only ~350 ms after the click. List rows
+   (tracklists, queue, friends) no longer fade in one after another either:
+   a page shows complete as soon as it is drawn. */
+html.terminal-full .main-contextMenu-menu,
+html.terminal-full .main-contextMenu-menu > li,
+html.terminal-full [role="menu"],
+html.terminal-full [role="menu"] > li,
+html.terminal-full [role="menuitem"],
+html.terminal-full [role="listbox"],
+html.terminal-full [role="tooltip"],
+html.terminal-full .tippy-box,
+html.terminal-full .main-contextMenu-tippy,
+html.terminal-full .GenericModal,
+html.terminal-full [role="dialog"],
+html.terminal-full .spicetify-popup,
+html.terminal-full .Root__main-view .main-trackList-trackListRow,
+html.terminal-full #Desktop_PanelContainer_Id [data-encore-id="listRow"],
+html.terminal-full .main-nowPlayingView-queueItem,
+html.terminal-full .main-buddyFeed-friendActivity,
+html.terminal-full .main-devicePicker-devicesList > li {
+  animation: none !important;
+}
+html.terminal-full .main-contextMenu-menuItemButton,
+html.terminal-full .main-contextMenu-menuItemButton::before,
+html.terminal-full [role="menuitem"] {
+  transition: none !important;
+}
+/* --- END FULL/CHROME ----------------------------------------------------- */

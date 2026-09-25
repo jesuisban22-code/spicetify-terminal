@@ -34,7 +34,7 @@
 	// have Cascadia installed; Cascadia/Consolas only get reached on
 	// Windows (Menlo on macOS), where none of the Linux faces exist.
 	// Shown by the boot log and `neofetch`; keep in sync with CHANGELOG.md.
-	var THEME_VERSION = "1.2.0";
+	var THEME_VERSION = "2.0.0";
 
 	var TERM_FONT_STACK =
 		"'JetBrains Mono', 'Fira Code', 'Hack', 'DejaVu Sans Mono', " +
@@ -85,6 +85,13 @@
 	// below, same as before.
 	// ---------------------------------------------------------------------
 	var FEATURE_REGISTRY = [
+		{
+			key: "fullConversion",
+			label: "mode terminal complet (interface entièrement refaite)",
+			default: true,
+			setup: function () { setupFullConversion(); },
+			onToggle: function () { applyFullConversionSetting(); }
+		},
 		{ key: "boot", label: "séquence de démarrage au lancement", default: true },
 		{ key: "pulse", label: "pulsation lecture en cours (couleur + tempo)", default: true, setup: function () { setupNowPlayingPulse(); }, onToggle: function () { applyPulseVisuals(); } },
 		{ key: "transitions", label: "transitions de page", default: true, setup: function () { setupPageTransitions(); } },
@@ -148,6 +155,10 @@
 	}
 
 	var settings = loadSettings();
+	var fullConversionParts = []; // { setup: fn, teardown: fn }, registered in the FULL/* sections
+	// Tag <html> right away so the full-conversion CSS applies from the
+	// first paint instead of flashing the native UI until Spicetify is ready.
+	document.documentElement.classList.toggle("terminal-full", !!settings.fullConversion);
 
 	// ---------------------------------------------------------------------
 	// Readiness poll — the pattern used by every extension already installed
@@ -165,6 +176,27 @@
 		setTimeout(function () {
 			waitFor(checkFn, cb, attemptsLeft - 1);
 		}, 200);
+	}
+
+
+	// Runs fn after the next paint. Navigation handlers are deferred with
+	// this so a page change is drawn at native speed and the theme's
+	// decorations (titles, tags, ASCII pass, transitions) land one frame
+	// later — measured, doing them synchronously in the click task added
+	// ~180 ms to input-to-paint on a page change.
+	function afterPaint(fn) {
+		requestAnimationFrame(function () {
+			setTimeout(fn, 0);
+		});
+	}
+
+	// History.listen, with the callback moved after the next paint.
+	function tfListenHistory(cb) {
+		return Spicetify.Platform.History.listen(function (location) {
+			afterPaint(function () {
+				cb(location);
+			});
+		});
 	}
 
 	// ---------------------------------------------------------------------
@@ -910,6 +942,11 @@
 				canvas.className = "terminal-ascii-art";
 				canvas.title = "click to toggle cover art";
 				container.style.position = container.style.position || "relative";
+				// Class-based clip instead of a `:has(> .terminal-ascii-art)`
+				// rule: a bare :has() subject is tested against every element
+				// on every style change, which showed up at the top of the
+				// selector cost profile.
+				container.classList.add("terminal-ascii-host");
 				container.appendChild(canvas);
 				canvas.addEventListener("click", function (e) {
 					e.stopPropagation();
@@ -979,7 +1016,7 @@
 		// "Vendredi = nouveautés") never got their first renderAll() pass
 		// and stayed as plain cover art forever.
 		Spicetify.Player.addEventListener("songchange", renderWithRetries);
-		Spicetify.Player.addEventListener("appchange", renderWithRetries);
+		Spicetify.Player.addEventListener("appchange", function () { afterPaint(renderWithRetries); });
 		// Spicetify.Platform.History can still be unready at this exact
 		// point even though Spicetify.Player already is (the two ready up
 		// independently) — a one-shot truthiness check here would then
@@ -987,7 +1024,7 @@
 		// until it's actually there.
 		waitFor(
 			function () { return Spicetify.Platform && Spicetify.Platform.History && Spicetify.Platform.History.listen; },
-			function () { Spicetify.Platform.History.listen(renderWithRetries); }
+			function () { tfListenHistory(renderWithRetries); }
 		);
 
 		// Belt-and-suspenders catch-all: shelf content on Home/Search often
@@ -1078,7 +1115,7 @@
 		waitFor(
 			function () { return Spicetify.Platform && Spicetify.Platform.History && Spicetify.Platform.History.listen; },
 			function () {
-				Spicetify.Platform.History.listen(function (location) {
+				tfListenHistory(function (location) {
 					onNavigate((location && location.pathname) || "");
 				});
 			}
@@ -1165,6 +1202,1242 @@
 	}
 
 	// =======================================================================
+	// Full conversion ("mode terminal complet") — re-skins the whole client
+	// so it reads as a terminal OS instead of Spotify. Every rule lives
+	// under html.terminal-full in user.css; this section only adds what CSS
+	// can't do on its own. Turning the setting off removes the class and
+	// calls each part's teardown, restoring the v1.2.0 look exactly.
+	// Native Spotify nodes are never moved or removed — only restyled,
+	// annotated (data-* / classes) or overlaid — so playback, menus and
+	// Spicetify APIs that click native buttons keep working.
+	// =======================================================================
+	// fullConversionParts is declared near `settings` (top of file) so it
+	// exists even when the init waitFor fires synchronously.
+
+	function setupFullConversion() {
+		// Deferred one tick: on the real client Spicetify.Player exists as
+		// soon as this file runs, so the init waitFor fires synchronously —
+		// before the FULL/* sections further down have registered their
+		// parts. Applying right away ran an empty list (CSS on, every JS
+		// part — pane titles, header metadata, playback sync, branding —
+		// silently missing). By the next tick the whole file has executed.
+		setTimeout(applyFullConversionSetting, 0);
+	}
+
+	function applyFullConversionSetting() {
+		var on = !!settings.fullConversion;
+		document.documentElement.classList.toggle("terminal-full", on);
+		var pip = window.documentPictureInPicture && window.documentPictureInPicture.window;
+		if (pip && settings.miniPlayerTheme) {
+			var old = pip.document.getElementById("terminal-mini-player-style");
+			if (old) old.parentNode.removeChild(old);
+			injectMiniPlayerStyle(pip);
+		}
+		fullConversionParts.forEach(function (part) {
+			try {
+				if (on) part.setup();
+				else if (part.teardown) part.teardown();
+			} catch (e) {
+				/* one part failing must not take the others (or the app) down */
+			}
+		});
+	}
+
+	// --- FULL/SHELL: layout, top bar, library (agent A) -------------------
+	// The shell itself (tmux-style panes, prompt top bar, file-tree
+	// library) is pure CSS under html.terminal-full. The only thing CSS
+	// can't know is *where* the user is and *who* they are, so this part
+	// publishes two strings as custom properties on <html>, read by
+	// `content: var(...)` in user.css:
+	//   --tf-main-title  "[1:~/playlist/Chill Mix]"  main pane title bar
+	//   --tf-prompt      "hugo@terminal:~/playlist$"  top-bar prompt
+	// Custom properties on <html> rather than data-* attributes on
+	// Spotify's own nodes on purpose: React re-creates .Root__main-view /
+	// the global nav subtree on some layout changes, which would silently
+	// drop an attribute, while <html> is never re-rendered. It also keeps
+	// teardown trivial (two removeProperty calls) and touches zero native
+	// DOM.
+	//
+	// Cost: one History.listen callback per navigation plus at most four
+	// short timed re-reads of the page name (Spotify renders the new page's
+	// heading a few frames after the route changes). No MutationObserver.
+	var shellState = { on: false, unlisten: null, keptListener: false, timers: [], navSeq: 0, lastName: "" };
+
+	// Routes whose second segment is an opaque id that reads better as the
+	// page's own name: /playlist/37i9dQZF1DX... -> ~/playlist/Chill Mix.
+	var SHELL_NAMED_ROUTES = {
+		playlist: 1, album: 1, artist: 1, show: 1, episode: 1, user: 1,
+		genre: 1, track: 1, audiobook: 1, concert: 1, prerelease: 1
+	};
+
+	// Friendlier names for a few top-level routes whose raw path would be
+	// cryptic (collection/tracks is Liked Songs, preferences is Settings).
+	var SHELL_ROUTE_ALIASES = {
+		"collection/tracks": "~/liked-songs",
+		"collection/episodes": "~/episodes",
+		"collection": "~/library",
+		"preferences": "~/settings",
+		"lyrics": "~/lyrics",
+		"queue": "~/queue"
+	};
+
+	// Quote a JS string as a CSS <string> for `content:`. Backslashes and
+	// quotes are escaped; newlines collapse to spaces (a raw newline would
+	// end the string and invalidate the whole declaration).
+	function shellCssString(s) {
+		return '"' + String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/[\r\n]+/g, " ") + '"';
+	}
+
+	function shellClip(s, max) {
+		s = String(s || "").replace(/\s+/g, " ").trim();
+		return s.length > max ? s.slice(0, max - 1) + "…" : s;
+	}
+
+	// Current page's human name. Spotify labels its <main> landmark
+	// "Spotify – <page name>" on every route (see the main[tabindex="-1"]
+	// note near :focus-visible in user.css) — the cheapest, locale-correct
+	// source. The page's own <h1> is the fallback.
+	function shellPageName() {
+		var name = "";
+		try {
+			var main = document.querySelector(".Root__main-view main[aria-label]") || document.querySelector("main[aria-label]");
+			if (main) name = main.getAttribute("aria-label") || "";
+			name = name.replace(/^\s*Spotify\s*[\u2013\u2014\-:|]\s*/i, "");
+			if (/^spotify$/i.test(name.trim())) name = "";
+			if (!name) {
+				var h1 = document.querySelector(".Root__main-view h1");
+				if (h1) name = h1.textContent || "";
+			}
+		} catch (e) {
+			name = "";
+		}
+		return shellClip(name, 40);
+	}
+
+	function shellSafeDecode(s) {
+		try {
+			return decodeURIComponent(s);
+		} catch (e) {
+			return s;
+		}
+	}
+
+	// pathname -> { dir: "~/playlist", path: "~/playlist/Chill Mix" }.
+	// `dir` (first segment only) feeds the short top-bar prompt, `path`
+	// the main pane title.
+	function shellRoute(pathname, pageName) {
+		var segs = String(pathname || "/").split(/[?#]/)[0].split("/").filter(Boolean).map(shellSafeDecode);
+		if (!segs.length) return { dir: "~/home", path: "~/home" };
+		var two = segs.slice(0, 2).join("/");
+		if (SHELL_ROUTE_ALIASES[two]) return { dir: SHELL_ROUTE_ALIASES[two], path: SHELL_ROUTE_ALIASES[two] };
+		var kind = segs[0];
+		if (SHELL_ROUTE_ALIASES[kind] && segs.length === 1) return { dir: SHELL_ROUTE_ALIASES[kind], path: SHELL_ROUTE_ALIASES[kind] };
+		var dir = "~/" + shellClip(kind, 20);
+		if (SHELL_NAMED_ROUTES[kind]) {
+			// Ids are opaque; the page's own name is what the user recognizes.
+			// Extra segments after the id (e.g. /artist/<id>/discography) are
+			// kept as a readable suffix.
+			var tail = segs.slice(2).join("/");
+			var shown = pageName || (segs[1] ? shellClip(segs[1], 12) : "");
+			return { dir: dir, path: shellClip(dir + (shown ? "/" + shown : "") + (tail ? "/" + tail : ""), 64) };
+		}
+		// search/<query>/<tab> and friends are already human-readable.
+		return { dir: dir, path: shellClip("~/" + segs.join("/"), 64) };
+	}
+
+	function shellUserName() {
+		var n = currentDisplayName();
+		// Shell-style login: lower case, no spaces ("Hugo Ban" -> hugo-ban).
+		n = String(n).toLowerCase().replace(/\s+/g, "-").replace(/[^\w.\-\u00C0-\u024F]/g, "");
+		return shellClip(n || "user", 20);
+	}
+
+	function shellCurrentPath() {
+		try {
+			var loc = Spicetify.Platform && Spicetify.Platform.History && Spicetify.Platform.History.location;
+			if (loc && typeof loc.pathname === "string") return loc.pathname;
+		} catch (e) {
+			/* History not ready — fall through to home */
+		}
+		return "/";
+	}
+
+	function shellApplyTitles(pathname, pageName) {
+		if (!shellState.on) return;
+		var route = shellRoute(pathname, pageName);
+		// Kept in JS, not as custom properties on <html>: every write to a
+		// root custom property restyles the entire app (all inherit it), and
+		// this ran up to five times per navigation — measured as multi-second
+		// freezes on a large page. The pane-title layer reads mainTitle from
+		// here; the prompt vars go on the prompt's own small element.
+		shellState.mainTitle = "[1:" + route.path + "]";
+		var host = document.querySelector(".main-globalNav-historyButtons");
+		if (host) {
+			var full = shellCssString(shellUserName() + "@terminal:" + route.dir + "$");
+			var short = shellCssString(route.dir + "$");
+			if (host.style.getPropertyValue("--tf-prompt") !== full) host.style.setProperty("--tf-prompt", full);
+			if (host.style.getPropertyValue("--tf-prompt-short") !== short) host.style.setProperty("--tf-prompt-short", short);
+			shellState.promptHost = host;
+		}
+		schedulePaneTitles();
+	}
+
+	function shellClearTimers() {
+		for (var i = 0; i < shellState.timers.length; i++) clearTimeout(shellState.timers[i]);
+		shellState.timers = [];
+	}
+
+	// Title right away from the path alone (never shows a stale name), then
+	// re-read the page name a few times as the new page mounts. A name equal
+	// to the previous page's is treated as "not rendered yet" except on the
+	// last attempt (two pages can legitimately share a name).
+	function shellOnNavigate(pathname) {
+		if (!shellState.on) return;
+		shellClearTimers();
+		var seq = ++shellState.navSeq;
+		var previousName = shellState.lastName || "";
+		shellApplyTitles(pathname, "");
+		var kind = String(pathname || "").split("/").filter(Boolean)[0];
+		if (!SHELL_NAMED_ROUTES[kind]) {
+			shellState.lastName = "";
+			return;
+		}
+		var delays = [120, 400, 1000, 2400];
+		delays.forEach(function (ms, i) {
+			shellState.timers.push(setTimeout(function () {
+				if (!shellState.on || seq !== shellState.navSeq) return;
+				var name = shellPageName();
+				var last = i === delays.length - 1;
+				if (!name || (name === previousName && !last)) return;
+				shellState.lastName = name;
+				shellApplyTitles(pathname, name);
+			}, ms));
+		});
+	}
+
+	function setupFullShell() {
+		if (shellState.on) return; // setup can run again on every toggle-on
+		shellState.on = true;
+		shellOnNavigate(shellCurrentPath());
+		waitFor(
+			function () { return Spicetify.Platform && Spicetify.Platform.History && Spicetify.Platform.History.listen; },
+			function () {
+				// Torn down (or re-set-up) while we were still waiting.
+				if (!shellState.on || shellState.unlisten || shellState.keptListener) return;
+				var off = tfListenHistory(function (location) {
+					if (!shellState.on) return;
+					shellOnNavigate((location && location.pathname) || (location && location.location && location.location.pathname) || shellCurrentPath());
+				});
+				// history v4/v5 return an unlisten function. Should a build
+				// ever not, the listener stays attached but inert (it checks
+				// shellState.on first) and is never attached a second time.
+				if (typeof off === "function") shellState.unlisten = off;
+				else shellState.keptListener = true;
+				// The display name may only have been ready now.
+				shellOnNavigate(shellCurrentPath());
+			}
+		);
+	}
+
+	function teardownFullShell() {
+		shellState.on = false;
+		shellState.navSeq++;
+		shellClearTimers();
+		if (shellState.unlisten) {
+			try {
+				shellState.unlisten();
+			} catch (e) {
+				/* already detached */
+			}
+		}
+		shellState.unlisten = null;
+		shellState.lastName = "";
+		shellState.mainTitle = "";
+		var host = shellState.promptHost;
+		if (host) {
+			host.style.removeProperty("--tf-prompt");
+			host.style.removeProperty("--tf-prompt-short");
+			if (host.getAttribute("style") === "") host.removeAttribute("style");
+			shellState.promptHost = null;
+		}
+	}
+
+	fullConversionParts.push({ setup: setupFullShell, teardown: teardownFullShell });
+	// Pane titles ([0:~/library] [1:~/…] [2:now-playing]) are drawn in our
+	// own fixed layer, positioned from each pane's measured rect, rather
+	// than as ::before pseudo-elements on Spotify's panes. A pseudo-element
+	// only lands in the title bar if the pane's internal layout matches what
+	// we expect; on the real client it could end up over the pane content
+	// and overlap its text. Measuring the rect makes the position exact
+	// whatever Spotify's markup, and the layer never takes clicks.
+	var paneTitles = null; // { root, labels: {nav, main, right}, ro, timer, onResize, onOver }
+
+	function layoutPaneTitles() {
+		if (!paneTitles) return;
+		var html = document.documentElement;
+		var panes = {
+			nav: document.querySelector(".Root__nav-bar"),
+			main: document.querySelector(".Root__main-view"),
+			right: document.querySelector(".Root__right-sidebar")
+		};
+		var hovered = paneTitles.hovered;
+		Object.keys(panes).forEach(function (k) {
+			var el = panes[k], label = paneTitles.labels[k];
+			var r = el && el.getBoundingClientRect();
+			var visible = !!(r && r.width > 40 && r.height > 40);
+			if (visible && k === "right") {
+				var aside = el.querySelector("aside");
+				visible = !!(aside && aside.children.length);
+			}
+			label.style.display = visible ? "" : "none";
+			if (!visible) return;
+			// Read from inline style / the DOM, never getComputedStyle: that
+			// forces a full style recalc whenever anything is dirty, which on
+			// a 500ms poll made the whole client stutter.
+			var text;
+			if (k === "nav") text = r.width < 120 ? "[0]" : "[0:~/library]";
+			else if (k === "main") text = shellState.mainTitle || "[1:~/home]";
+			else if (el.querySelector("#queue-panel, [data-testid=\"queue-page\"]")) text = "[2:queue]";
+			else if (el.querySelector("[data-testid=\"buddy-feed\"]")) text = "[2:friends]";
+			else text = "[2:now-playing]";
+			if (label.textContent !== text) label.textContent = text;
+			label.style.transform = "translate(" + Math.round(r.left + 6) + "px," + Math.round(r.top + 3) + "px)";
+			label.style.maxWidth = Math.max(0, Math.round(r.width - 12)) + "px";
+			label.classList.toggle("is-active", hovered === k);
+		});
+	}
+
+	function schedulePaneTitles() {
+		if (!paneTitles || paneTitles.raf) return;
+		paneTitles.raf = requestAnimationFrame(function () {
+			if (!paneTitles) return;
+			paneTitles.raf = 0;
+			layoutPaneTitles();
+		});
+	}
+
+	function setupPaneTitles() {
+		if (paneTitles) return;
+		var root = document.createElement("div");
+		root.id = "tf-pane-titles";
+		root.setAttribute("aria-hidden", "true");
+		var labels = {};
+		["nav", "main", "right"].forEach(function (k) {
+			var s = document.createElement("span");
+			s.className = "tf-pane-title tf-pane-title-" + k;
+			root.appendChild(s);
+			labels[k] = s;
+		});
+		document.body.appendChild(root);
+		paneTitles = { root: root, labels: labels, hovered: null, raf: 0 };
+		paneTitles.onResize = schedulePaneTitles;
+		window.addEventListener("resize", paneTitles.onResize);
+		paneTitles.onOver = function (e) {
+			var t = e.target, k = null;
+			if (t && t.closest) {
+				if (t.closest(".Root__nav-bar")) k = "nav";
+				else if (t.closest(".Root__main-view")) k = "main";
+				else if (t.closest(".Root__right-sidebar")) k = "right";
+			}
+			if (k !== paneTitles.hovered) {
+				paneTitles.hovered = k;
+				schedulePaneTitles();
+			}
+		};
+		document.addEventListener("pointerover", paneTitles.onOver, true);
+		if (window.ResizeObserver) {
+			paneTitles.ro = new ResizeObserver(schedulePaneTitles);
+			[".Root__nav-bar", ".Root__main-view", ".Root__right-sidebar"].forEach(function (sel) {
+				var el = document.querySelector(sel);
+				if (el) paneTitles.ro.observe(el);
+			});
+		}
+		// Titles also change on navigation and when the right panel switches
+		// content; a slow poll covers both without a MutationObserver on the
+		// whole app (it only writes when something actually changed).
+		paneTitles.timer = setInterval(schedulePaneTitles, 1000);
+		layoutPaneTitles();
+	}
+
+	function teardownPaneTitles() {
+		if (!paneTitles) return;
+		window.removeEventListener("resize", paneTitles.onResize);
+		document.removeEventListener("pointerover", paneTitles.onOver, true);
+		if (paneTitles.ro) paneTitles.ro.disconnect();
+		clearInterval(paneTitles.timer);
+		if (paneTitles.raf) cancelAnimationFrame(paneTitles.raf);
+		if (paneTitles.root.parentNode) paneTitles.root.parentNode.removeChild(paneTitles.root);
+		paneTitles = null;
+	}
+
+	fullConversionParts.push({ setup: setupPaneTitles, teardown: teardownPaneTitles });
+	// --- END FULL/SHELL ----------------------------------------------------
+
+	// --- FULL/PLAYER: status line, right sidebar, fullscreen (agent B) ----
+	// The status line (user.css FULL/PLAYER) is almost all CSS. The one thing
+	// CSS can't read reliably is playback state: Spotify renders play vs
+	// pause as two different SVG paths, and the only other signal on the
+	// button is a localized aria-label ("Play", "Lecture", …). Matching
+	// either one is exactly what the brief rules out (path[d], localized
+	// labels). Shuffle/repeat do carry aria-checked in current builds, but
+	// that has moved between builds (class-only state in some), so this
+	// mirrors all four from Spicetify.Player onto <html> as data-* attributes:
+	//   data-tf-playback = playing | paused   (drives [ ▶ ] / [ ❚❚ ] and the
+	//                                           mode tag)
+	//   data-tf-shuffle  = 1 | 0
+	//   data-tf-repeat   = 0 | 1 | 2          (2 = repeat one → ↻¹)
+	//   data-tf-muted    = 1 | 0              ("vol" / "mute")
+	// The CSS reads them alongside the native attributes (either one turns a
+	// state on), and falls back to the native SVG when they're absent, so a
+	// Spicetify API change degrades to "Spotify's icon in brackets", never
+	// to a blank button.
+	// Same attributes go onto the mini-player's document when it's open
+	// (Document PiP is a separate document with its own <html>), so
+	// FULL_PLAYER_PIP_CSS below can show the same glyphs there.
+	// Updated on the player's own events (onplaypause, songchange), right
+	// after a click on a transport / mute button (shuffle/repeat/mute have
+	// no event), and by a cheap 1.5s poll that catches keyboard shortcuts
+	// and changes made from another device. Every write is skipped when the
+	// value is unchanged, so the poll causes no style recalcs.
+	var fullPlayer = { active: false, timer: null, onEvent: null, onClick: null, onPipEnter: null };
+	var FULL_PLAYER_ATTRS = ["data-tf-playback", "data-tf-shuffle", "data-tf-repeat", "data-tf-muted"];
+
+	function fullPlayerRoots() {
+		// The state goes on the playbar itself, not <html>: every consumer
+		// lives inside the bar, and an attribute change on <html> restyles
+		// the whole app on each play/pause/shuffle. The mini player is a
+		// separate small document, so its root is fine.
+		var bar = document.querySelector(".Root__now-playing-bar");
+		var roots = [bar || document.documentElement];
+		try {
+			var pip = window.documentPictureInPicture && window.documentPictureInPicture.window;
+			if (pip && pip.document && pip.document.documentElement) roots.push(pip.document.documentElement);
+		} catch (e) {
+			/* PiP window closing mid-call — just skip it */
+		}
+		return roots;
+	}
+
+	function fullPlayerSetAttr(roots, name, value) {
+		for (var i = 0; i < roots.length; i++) {
+			if (value === null) {
+				if (roots[i].hasAttribute(name)) roots[i].removeAttribute(name);
+			} else if (roots[i].getAttribute(name) !== value) {
+				roots[i].setAttribute(name, value);
+			}
+		}
+	}
+
+	function fullPlayerSync() {
+		if (!fullPlayer.active) return;
+		var P = window.Spicetify && Spicetify.Player;
+		if (!P) return;
+		var roots = fullPlayerRoots();
+		try {
+			var paused = null;
+			if (P.data && typeof P.data.isPaused === "boolean") paused = P.data.isPaused;
+			else if (typeof P.isPlaying === "function") paused = !P.isPlaying();
+			var hasItem = !!(P.data && P.data.item);
+			// Nothing loaded: no attribute, so the mode tag reads "idle" and
+			// the play button keeps its native icon.
+			fullPlayerSetAttr(roots, "data-tf-playback", !hasItem || paused === null ? null : paused ? "paused" : "playing");
+			if (typeof P.getShuffle === "function") fullPlayerSetAttr(roots, "data-tf-shuffle", P.getShuffle() ? "1" : "0");
+			if (typeof P.getRepeat === "function") {
+				var r = Number(P.getRepeat()) || 0;
+				fullPlayerSetAttr(roots, "data-tf-repeat", String(r > 2 ? 2 : r < 0 ? 0 : r));
+			}
+			if (typeof P.getMute === "function") fullPlayerSetAttr(roots, "data-tf-muted", P.getMute() ? "1" : "0");
+		} catch (e) {
+			/* a Player getter throwing must not break the poll */
+		}
+	}
+
+	function setupFullPlayer() {
+		if (fullPlayer.active) return; // parts can be set up again on every toggle
+		fullPlayer.active = true;
+		var P = window.Spicetify && Spicetify.Player;
+
+		fullPlayer.onEvent = function () {
+			// songchange fires before Player.data reflects the new item on
+			// some builds; one frame later it's settled.
+			setTimeout(fullPlayerSync, 0);
+		};
+		if (P && typeof P.addEventListener === "function") {
+			P.addEventListener("onplaypause", fullPlayer.onEvent);
+			P.addEventListener("songchange", fullPlayer.onEvent);
+		}
+
+		fullPlayer.onClick = function (e) {
+			var t = e.target;
+			if (!t || !t.closest) return;
+			if (t.closest('[data-testid^="control-button-"], [data-testid="volume-bar-toggle-mute-button"]')) {
+				setTimeout(fullPlayerSync, 120);
+			}
+		};
+		document.addEventListener("click", fullPlayer.onClick, true);
+
+		if (window.documentPictureInPicture && window.documentPictureInPicture.addEventListener) {
+			fullPlayer.onPipEnter = function () { setTimeout(fullPlayerSync, 60); };
+			window.documentPictureInPicture.addEventListener("enter", fullPlayer.onPipEnter);
+		}
+
+		fullPlayer.timer = setInterval(fullPlayerSync, 1500);
+		fullPlayerSync();
+	}
+
+	function teardownFullPlayer() {
+		if (!fullPlayer.active) return;
+		fullPlayer.active = false;
+		var P = window.Spicetify && Spicetify.Player;
+		if (P && typeof P.removeEventListener === "function" && fullPlayer.onEvent) {
+			P.removeEventListener("onplaypause", fullPlayer.onEvent);
+			P.removeEventListener("songchange", fullPlayer.onEvent);
+		}
+		// Without removeEventListener the handler stays registered, but it
+		// only schedules fullPlayerSync, which returns early while inactive.
+		fullPlayer.onEvent = null;
+		if (fullPlayer.onClick) document.removeEventListener("click", fullPlayer.onClick, true);
+		fullPlayer.onClick = null;
+		if (fullPlayer.onPipEnter && window.documentPictureInPicture) {
+			window.documentPictureInPicture.removeEventListener("enter", fullPlayer.onPipEnter);
+		}
+		fullPlayer.onPipEnter = null;
+		clearInterval(fullPlayer.timer);
+		fullPlayer.timer = null;
+		var roots = fullPlayerRoots().concat([document.documentElement]);
+		FULL_PLAYER_ATTRS.forEach(function (name) { fullPlayerSetAttr(roots, name, null); });
+	}
+
+	fullConversionParts.push({ setup: setupFullPlayer, teardown: teardownFullPlayer });
+
+	// Mini player (Document PiP) in full-conversion mode. user.css never
+	// reaches that document, and injectMiniPlayerStyle() (outside this
+	// section) only recolors it. This is the status line look for it, meant
+	// to be appended to that style tag when html.terminal-full is on:
+	// square everything, bracketed play button, glyph transport, and the
+	// block seek/volume bars. The PiP document can't see the main page's
+	// :root variables, so the palette is restated here, with the same values
+	// as user.css :root, which is also what injectMiniPlayerStyle already does.
+	// Play/pause glyphs use the data-tf-playback attribute that
+	// fullPlayerSync() also writes onto the PiP <html>; until it lands, the
+	// native icon shows between the brackets.
+	var FULL_PLAYER_PIP_CSS = [
+		":root {",
+		"  --term-bg: #15171c; --term-bg-tinted: #1a1c22; --term-bg-hi: #1f2229;",
+		"  --term-text: #e6e6e6; --term-subdued: #8a93a6; --term-border: #2b2e38;",
+		"  --term-green: #5ebdab;",
+		"}",
+		"*, *::before, *::after { border-radius: 0 !important; }",
+		"body { background: var(--term-bg) !important; }",
+		"img { outline: 1px solid var(--term-border); outline-offset: -1px; }",
+		":is([data-testid=\"control-button-shuffle\"], [data-testid=\"control-button-skip-back\"], [data-testid=\"control-button-skip-forward\"], [data-testid=\"control-button-repeat\"]) {",
+		"  min-width: 32px; height: 32px; display: inline-flex !important; align-items: center; justify-content: center;",
+		"  background: transparent !important; border: 1px solid transparent !important; color: var(--term-subdued) !important;",
+		"  font-size: 16px; line-height: 1; transform: none !important; transition: color 120ms, background-color 120ms;",
+		"}",
+		":is([data-testid=\"control-button-shuffle\"], [data-testid=\"control-button-skip-back\"], [data-testid=\"control-button-skip-forward\"], [data-testid=\"control-button-repeat\"]) svg { display: none !important; }",
+		"[data-testid=\"control-button-shuffle\"]::before { content: \"⤮\"; }",
+		"[data-testid=\"control-button-skip-back\"]::before { content: \"⏮\\FE0E\"; }",
+		"[data-testid=\"control-button-skip-forward\"]::before { content: \"⏭\\FE0E\"; }",
+		"[data-testid=\"control-button-repeat\"]::before { content: \"↻\"; }",
+		"[data-testid=\"control-button-repeat\"][aria-checked=\"mixed\"]::before, html[data-tf-repeat=\"2\"] [data-testid=\"control-button-repeat\"]::before { content: \"↻¹\"; }",
+		":is([data-testid=\"control-button-shuffle\"], [data-testid=\"control-button-skip-back\"], [data-testid=\"control-button-skip-forward\"], [data-testid=\"control-button-repeat\"])::after { display: none !important; }",
+		":is([data-testid=\"control-button-shuffle\"], [data-testid=\"control-button-skip-back\"], [data-testid=\"control-button-skip-forward\"], [data-testid=\"control-button-repeat\"]):hover { color: var(--term-text) !important; background-color: var(--term-bg-hi) !important; }",
+		":is([data-testid=\"control-button-shuffle\"], [data-testid=\"control-button-repeat\"]):is([aria-checked=\"true\"], [aria-checked=\"mixed\"]),",
+		"html[data-tf-shuffle=\"1\"] [data-testid=\"control-button-shuffle\"],",
+		"html:is([data-tf-repeat=\"1\"], [data-tf-repeat=\"2\"]) [data-testid=\"control-button-repeat\"] {",
+		"  color: var(--term-bg) !important; background-color: var(--term-green) !important;",
+		"}",
+		"[data-testid=\"control-button-playpause\"] {",
+		"  width: auto !important; min-width: 64px; height: 32px; padding: 0 8px !important; gap: 2px;",
+		"  display: inline-flex !important; align-items: center; justify-content: center;",
+		"  background: transparent !important; border: 1px solid var(--term-green) !important; color: var(--term-green) !important;",
+		"  font-size: 14px; font-weight: 700; line-height: 1; transform: none !important; box-shadow: none !important;",
+		"}",
+		"[data-testid=\"control-button-playpause\"]::before { content: \"[\"; }",
+		"[data-testid=\"control-button-playpause\"]::after { content: \"]\"; }",
+		"[data-testid=\"control-button-playpause\"] > span { display: inline-flex !important; align-items: center; justify-content: center; min-width: 3ch; width: auto !important; height: auto !important; background: transparent !important; color: inherit !important; }",
+		"[data-testid=\"control-button-playpause\"] svg { fill: currentColor; }",
+		"html[data-tf-playback] [data-testid=\"control-button-playpause\"] > span > * { display: none !important; }",
+		"html[data-tf-playback] [data-testid=\"control-button-playpause\"] > span::before { content: \"▶\\FE0E\"; }",
+		"html[data-tf-playback=\"playing\"] [data-testid=\"control-button-playpause\"] > span::before { content: \"❚❚\"; }",
+		"[data-testid=\"control-button-playpause\"]:hover { color: var(--term-bg) !important; background-color: var(--term-green) !important; }",
+		":is([data-testid=\"progress-bar-background\"], .x-progressBar-progressBarBg, .x-progressBar-background) {",
+		"  height: 8px !important; background-color: var(--term-border) !important;",
+		"  -webkit-mask-image: repeating-linear-gradient(90deg, var(--term-bg) 0 6px, transparent 6px 8px);",
+		"  mask-image: repeating-linear-gradient(90deg, var(--term-bg) 0 6px, transparent 6px 8px);",
+		"}",
+		":is(.x-progressBar-fillColor, .x-progressBar-foreground, .x-progressBar-progressFillColor) { background-color: var(--term-green) !important; }",
+		"[data-testid=\"progress-bar-handle\"] { width: 4px !important; height: 14px !important; background-color: var(--term-text) !important; box-shadow: none !important; }"
+	].join("\n");
+	// --- END FULL/PLAYER ---------------------------------------------------
+
+	// --- FULL/PAGES: home, search, headers, tracklists (agent C) ----------
+	// Two things in the main view that CSS alone can't express:
+	//
+	// 1. Entity header metadata as `key: value` lines. Spotify renders
+	//    "owner • 50 songs, 3 h 20 min" as a row of sibling pieces with no
+	//    per-piece hook, and the keys we want (owner / year / tracks...)
+	//    aren't in the DOM at all. So each native piece gets a
+	//    data-tf-key attribute (read by CSS via attr()) and the container
+	//    gets data-tf-meta — CSS only switches to the one-per-line layout
+	//    when that marker exists, so if classification ever fails the
+	//    header just keeps its native inline look. Nothing is moved, split
+	//    or re-texted: the owner link stays the same clickable node.
+	//    Classification is by structure first (links to /user/ or
+	//    /artist/), then by shape of the text (a 4-digit year, "N x, d"),
+	//    so it holds across UI languages.
+	//
+	// 2. The action-bar play label: `[ ▶ lire ]` vs `[ ❚❚ pause ]`. The
+	//    native icon already flips on its own; the word needs to know
+	//    whether THIS page's context is the one playing. That comes from
+	//    comparing the route (/playlist/<id> -> spotify:playlist:<id>) with
+	//    Player.data.context; routes we can't map get no attribute and CSS
+	//    falls back to a neutral "lecture" rather than guessing wrong.
+	//
+	// One MutationObserver on .Root__main-view (childList only — never
+	// attributes, so our own data-* writes can't retrigger it), coalesced
+	// into at most one scan per 180ms; each scan is two small
+	// querySelectorAll calls over a handful of nodes, and attributes are
+	// only written when their value actually changes.
+	var tfPages = {
+		active: false,
+		observer: null,
+		timer: 0,
+		rootTimer: 0,
+		onPlayer: null
+	};
+
+	var TF_PAGES_PLAY_SELECTOR =
+		".Root__main-view .main-actionBar-ActionBarPlayButtonContainer button, " +
+		".Root__main-view .main-actionBar-ActionBarRow [data-testid=\"play-button\"]";
+
+	function tfPagesSchedule() {
+		if (!tfPages.active || tfPages.timer) return;
+		tfPages.timer = setTimeout(function () {
+			tfPages.timer = 0;
+			tfPagesScan();
+		}, 180);
+	}
+
+	function tfPagesScan() {
+		if (!tfPages.active) return;
+		try { tfAnnotateHeaderMeta(); } catch (e) { /* never let a header break the page */ }
+		try { tfAnnotatePlayState(); } catch (e) { /* idem */ }
+	}
+
+	function tfMetaText(el) {
+		return (el.textContent || "").replace(/[•·]/g, " ").replace(/\s+/g, " ").trim();
+	}
+
+	function tfClassifyMetaPiece(el) {
+		var text = tfMetaText(el);
+		if (!text) return "sep";
+		if (el.matches("a[href*=\"/user/\"]") || el.querySelector("a[href*=\"/user/\"], [data-testid=\"creator-link\"]")) return "owner";
+		if (el.matches("a[href*=\"/artist/\"]") || el.querySelector("a[href*=\"/artist/\"]")) return "artist";
+		if (el.matches("a[href*=\"/show/\"]") || el.querySelector("a[href*=\"/show/\"]")) return "show";
+		if (/^\d{4}$/.test(text)) return "year";
+		if (/\d/.test(text) && /(like|save|j.aime|enregistr|sauvegard|guardad|gespeichert|me gusta|mi piace)/i.test(text)) return "saves";
+		if (/\d/.test(text) && /,/.test(text)) return "tracks";
+		if (/^(~|≈|about|environ|ca\.?|unos|circa)?\s*[\d\s:]+(h|hr|hrs|min|s|sec)\b/i.test(text)) return "duration";
+		if (/\d/.test(text)) return "tracks";
+		return "info";
+	}
+
+	function tfAnnotateHeaderMeta() {
+		var metas = document.querySelectorAll(".Root__main-view .main-entityHeader-metaData");
+		for (var i = 0; i < metas.length; i++) {
+			var meta = metas[i];
+			var pieces = meta.children;
+			// Some builds wrap every piece in one extra span; look through it.
+			if (pieces.length === 1 && pieces[0].children.length > 1) pieces = pieces[0].children;
+			var labelled = 0;
+			for (var j = 0; j < pieces.length; j++) {
+				var key = tfClassifyMetaPiece(pieces[j]);
+				if (pieces[j].getAttribute("data-tf-key") !== key) pieces[j].setAttribute("data-tf-key", key);
+				if (key !== "sep") labelled++;
+			}
+			if (labelled) {
+				if (meta.getAttribute("data-tf-meta") !== "1") meta.setAttribute("data-tf-meta", "1");
+			} else {
+				meta.removeAttribute("data-tf-meta");
+			}
+		}
+	}
+
+	// true / false when we know whether this page is the playing context,
+	// null when the route isn't one we can map.
+	function tfPageIsPlayingContext() {
+		var history = Spicetify.Platform && Spicetify.Platform.History;
+		var path = history && history.location && history.location.pathname;
+		if (!path) return null;
+		var data = Spicetify.Player && Spicetify.Player.data;
+		var ctx = (data && ((data.context && data.context.uri) || data.context_uri)) || "";
+		var item = (data && ((data.item && data.item.uri) || (data.track && data.track.uri))) || "";
+		var m = /^\/(playlist|album|artist|show|episode)\/([A-Za-z0-9]+)/.exec(path);
+		if (m) {
+			var uri = "spotify:" + m[1] + ":" + m[2];
+			return m[1] === "episode" ? item === uri : ctx === uri;
+		}
+		if (/^\/collection\/tracks/.test(path)) return /:collection$/.test(ctx);
+		if (/^\/collection\/your-episodes/.test(path)) return /:collection:your-episodes$/.test(ctx);
+		return null;
+	}
+
+	function tfAnnotatePlayState() {
+		var buttons = document.querySelectorAll(TF_PAGES_PLAY_SELECTOR);
+		if (!buttons.length) return;
+		var match = tfPageIsPlayingContext();
+		var data = Spicetify.Player && Spicetify.Player.data;
+		var state = match === null ? "" : (match && data && !data.isPaused ? "pause" : "play");
+		for (var i = 0; i < buttons.length; i++) {
+			if (state) {
+				if (buttons[i].getAttribute("data-tf-state") !== state) buttons[i].setAttribute("data-tf-state", state);
+			} else {
+				buttons[i].removeAttribute("data-tf-state");
+			}
+		}
+	}
+
+	function tfPagesAttachObserver(attemptsLeft) {
+		if (!tfPages.active) return;
+		var root = document.querySelector(".Root__main-view");
+		if (!root) {
+			// The main view mounts after theme.js on a cold start; poll for it
+			// briefly (~20s), same budget as waitFor elsewhere.
+			if (attemptsLeft > 0) {
+				tfPages.rootTimer = setTimeout(function () {
+					tfPages.rootTimer = 0;
+					tfPagesAttachObserver(attemptsLeft - 1);
+				}, 200);
+			}
+			return;
+		}
+		tfPages.observer = new MutationObserver(tfPagesSchedule);
+		tfPages.observer.observe(root, { childList: true, subtree: true });
+		tfPagesScan();
+	}
+
+	function setupFullPages() {
+		if (tfPages.active) return;
+		tfPages.active = true;
+		tfPages.onPlayer = function () { tfPagesSchedule(); };
+		if (Spicetify.Player && Spicetify.Player.addEventListener) {
+			Spicetify.Player.addEventListener("onplaypause", tfPages.onPlayer);
+			Spicetify.Player.addEventListener("songchange", tfPages.onPlayer);
+		}
+		tfPagesAttachObserver(100);
+	}
+
+	function teardownFullPages() {
+		tfPages.active = false;
+		if (tfPages.observer) tfPages.observer.disconnect();
+		tfPages.observer = null;
+		if (tfPages.timer) clearTimeout(tfPages.timer);
+		if (tfPages.rootTimer) clearTimeout(tfPages.rootTimer);
+		tfPages.timer = tfPages.rootTimer = 0;
+		if (tfPages.onPlayer && Spicetify.Player && Spicetify.Player.removeEventListener) {
+			Spicetify.Player.removeEventListener("onplaypause", tfPages.onPlayer);
+			Spicetify.Player.removeEventListener("songchange", tfPages.onPlayer);
+		}
+		tfPages.onPlayer = null;
+		var tagged = document.querySelectorAll("[data-tf-key], [data-tf-meta], [data-tf-state]");
+		for (var i = 0; i < tagged.length; i++) {
+			tagged[i].removeAttribute("data-tf-key");
+			tagged[i].removeAttribute("data-tf-meta");
+			tagged[i].removeAttribute("data-tf-state");
+		}
+	}
+
+	fullConversionParts.push({ setup: setupFullPages, teardown: teardownFullPages });
+	// --- END FULL/PAGES ----------------------------------------------------
+
+	// --- FULL/CHROME: overlays, branding, page tags (agent D) -------------
+	//
+	// Four independent parts, each registered on its own so one failing
+	// can't take the others down (applyFullConversionSetting wraps every
+	// part in its own try/catch):
+	//   1. page tag   — html[data-tf-page] from Platform.History
+	//   2. window title — "terminal" / "♪ Title — Artist · terminal"
+	//   3. UI strings — "Spotify" → "terminal" in Spicetify.Locale
+	//   4. idle title — Spicetify.AppTitle override
+	// plus two things that are NOT parts because they must work in BOTH
+	// modes (they're how you get back from either one): the palette's
+	// `mode` command and the Ctrl+Shift+Alt+N escape hatch.
+	//
+	// Every setup below is idempotent (safe to call again while already
+	// on), since applyFullConversionSetting runs every part's setup each
+	// time it's called with the mode on.
+	// ---------------------------------------------------------------------
+
+	// ---- 1. Page tag ------------------------------------------------------
+	// Sets data-tf-page on <html> so the full-conversion CSS can target a
+	// page type without relying on per-page hashed classes. Values (the
+	// ONLY values ever written — keep user.css selectors to this list):
+	//   home        /
+	//   search      /search, /search/<q>/..., /genre/... (browse)
+	//   playlist    /playlist/<id>
+	//   album       /album/<id>
+	//   artist      /artist/<id> (and /artist/<id>/discography etc.)
+	//   show        /show/<id> (podcast)
+	//   episode     /episode/<id>
+	//   collection  /collection/... (liked songs, your episodes, library)
+	//   lyrics      /lyrics
+	//   queue       /queue
+	//   settings    /preferences (Spotify's settings route), /settings
+	//   profile     /user/<id>
+	//   other       anything else (custom apps, /history, /concert...)
+	// The attribute is removed on teardown, so no rule keyed on it can
+	// leak into native mode even if it forgot the html.terminal-full scope.
+	var TF_PAGE_RULES = [
+		[/^\/?$/, "home"],
+		[/^\/(search|genre)(\/|$)/, "search"],
+		[/^\/playlist\//, "playlist"],
+		[/^\/album\//, "album"],
+		[/^\/artist\//, "artist"],
+		[/^\/show\//, "show"],
+		[/^\/episode\//, "episode"],
+		[/^\/collection(\/|$)/, "collection"],
+		[/^\/lyrics(\/|$)/, "lyrics"],
+		[/^\/queue(\/|$)/, "queue"],
+		[/^\/(preferences|settings)(\/|$)/, "settings"],
+		[/^\/user\//, "profile"]
+	];
+
+	function tfPageFromPath(path) {
+		path = String(path || "/");
+		for (var i = 0; i < TF_PAGE_RULES.length; i++) {
+			if (TF_PAGE_RULES[i][0].test(path)) return TF_PAGE_RULES[i][1];
+		}
+		return "other";
+	}
+
+	function tfHistoryReady() {
+		return Spicetify.Platform && Spicetify.Platform.History && Spicetify.Platform.History.listen;
+	}
+
+	var tfPageTag = { active: false, unlisten: null, listening: false };
+
+	// History.listen hands over the location in the v4 shape (location,
+	// action) on current builds — which is what setupPageTransitions relies
+	// on — but history v5 passes ({ location, action }). Accept both, and
+	// fall back to History.location for anything else.
+	function tfApplyPageTag(arg) {
+		if (!tfPageTag.active) return;
+		var loc = arg && arg.location && typeof arg.location.pathname === "string" ? arg.location : arg;
+		var path = loc && typeof loc.pathname === "string" ? loc.pathname : null;
+		if (path === null) {
+			try {
+				path = Spicetify.Platform.History.location.pathname;
+			} catch (e) {
+				path = "/";
+			}
+		}
+		document.documentElement.setAttribute("data-tf-page", tfPageFromPath(path));
+	}
+
+	fullConversionParts.push({
+		setup: function () {
+			tfPageTag.active = true;
+			waitFor(tfHistoryReady, function () {
+				if (!tfPageTag.active) return;
+				var H = Spicetify.Platform.History;
+				tfApplyPageTag(H.location);
+				// Subscribe once. If listen() returned an unsubscribe function we
+				// drop it on teardown and re-subscribe on the next setup; if it
+				// didn't (older builds), the one listener stays but goes inert via
+				// tfPageTag.active, and is never stacked a second time.
+				if (!tfPageTag.listening) {
+					var un = H.listen(function (location) { afterPaint(function () { tfApplyPageTag(location); }); });
+					tfPageTag.listening = true;
+					tfPageTag.unlisten = typeof un === "function" ? un : null;
+				}
+			});
+		},
+		teardown: function () {
+			tfPageTag.active = false;
+			if (tfPageTag.unlisten) {
+				try {
+					tfPageTag.unlisten();
+				} catch (e) {
+					/* router already gone — nothing to unsubscribe from */
+				}
+				tfPageTag.unlisten = null;
+				tfPageTag.listening = false;
+			}
+			document.documentElement.removeAttribute("data-tf-page");
+		}
+	});
+
+	// ---- 2. Window title --------------------------------------------------
+	// document.title is what the OS shows in the title bar, taskbar and
+	// alt-tab on Windows and Linux. Spotify rewrites it on every track
+	// change and on every idle/playing switch, so a one-shot write isn't
+	// enough: a MutationObserver on <title> re-applies our version after
+	// each of Spotify's writes.
+	//
+	// Formats Spotify has used (and what they become):
+	//   "Spotify", "Spotify Premium", "Spotify Free"   → "terminal"
+	//   "Title • Artist"  (current desktop/xpui)       → "♪ Title — Artist · terminal"
+	//   "Artist - Title"  (legacy desktop)             → "♪ Title — Artist · terminal"
+	//   "... - Spotify" / "Spotify – ..." (web-style)  → brand stripped first
+	// The order ambiguity (title first or artist first) is settled with
+	// the real current track from Spicetify.Player.data when it matches
+	// the string; the separator-based guess is only the fallback.
+	//
+	// Loop safety: every string we write ends in TF_TITLE_TAIL (or is
+	// exactly "terminal"), is recorded in tfTitle.written, and the observer
+	// ignores both — so our own write never triggers a second rewrite.
+	var TF_TITLE_TAIL = " · terminal";
+	var TF_BRAND_ONLY = /^\s*Spotify(?:\s+(?:Premium|Free|Family|Duo|Student))?\s*$/i;
+	var TF_BRAND_SUFFIX = /\s+[-–—|•·:]\s+Spotify(?:\s+(?:Premium|Free))?\s*$/i;
+	var TF_BRAND_PREFIX = /^\s*Spotify(?:\s+(?:Premium|Free))?\s+[-–—|•·:]\s+/i;
+
+	function tfCurrentTrack() {
+		try {
+			var item = Spicetify.Player && Spicetify.Player.data && Spicetify.Player.data.item;
+			if (!item) return null;
+			var name = item.name || (item.metadata && item.metadata.title) || "";
+			var artists = (item.artists || [])
+				.map(function (a) { return a && a.name; })
+				.filter(Boolean);
+			if (!artists.length && item.metadata && item.metadata.artist_name) artists = [item.metadata.artist_name];
+			return name ? { name: name, artists: artists } : null;
+		} catch (e) {
+			return null;
+		}
+	}
+
+	function tfTrackTitle(name, artist) {
+		return "♪ " + name + (artist ? " — " + artist : "") + TF_TITLE_TAIL;
+	}
+
+	// Pure function: raw Spotify title in, terminal title out. Returns
+	// the input unchanged when there's nothing to rebrand.
+	function tfRewriteTitle(raw) {
+		if (typeof raw !== "string" || !raw) return raw;
+		if (raw === "terminal" || raw.slice(-TF_TITLE_TAIL.length) === TF_TITLE_TAIL) return raw;
+		if (TF_BRAND_ONLY.test(raw)) return "terminal";
+		var s = raw.replace(TF_BRAND_SUFFIX, "").replace(TF_BRAND_PREFIX, "").trim();
+		var branded = s !== raw.trim();
+
+		var t = tfCurrentTrack();
+		if (t && s.indexOf(t.name) !== -1) {
+			var matched = t.artists.filter(function (a) { return s.indexOf(a) !== -1; });
+			if (matched.length) return tfTrackTitle(t.name, t.artists.join(", "));
+		}
+		// xpui order: "Title • Artist". A title may itself contain " - "
+		// ("Song - Remastered 2011 • Artist"), so the bullet wins.
+		var m = /^(.+?)\s+[•·]\s+(.+)$/.exec(s);
+		if (m) return tfTrackTitle(m[1], m[2]);
+		// Legacy order: "Artist - Title".
+		m = /^(.+?)\s+[-–—]\s+(.+)$/.exec(s);
+		if (m) return tfTrackTitle(m[2], m[1]);
+		if (/\bSpotify\b/.test(s)) return s.replace(/\bSpotify\b/g, "terminal");
+		if (branded) return s ? s + TF_TITLE_TAIL : "terminal";
+		return raw;
+	}
+
+	var tfTitle = { active: false, obs: null, headObs: null, el: null, timer: null, written: null, original: null };
+
+	function tfTitleRun() {
+		tfTitle.timer = null;
+		if (!tfTitle.active) return;
+		var cur = document.title;
+		if (cur === tfTitle.written) return;
+		var next = tfRewriteTitle(cur);
+		tfTitle.original = cur;
+		if (next === cur) return;
+		tfTitle.written = next;
+		document.title = next;
+	}
+
+	// Debounced: Spotify sometimes writes the title twice in a row on a
+	// track change; one rewrite 30ms later covers both.
+	function tfTitleSchedule() {
+		if (tfTitle.timer) clearTimeout(tfTitle.timer);
+		tfTitle.timer = setTimeout(tfTitleRun, 30);
+	}
+
+	// Observes only the <title> element itself (its text), plus <head>'s
+	// direct children (childList, no subtree) in case the element gets
+	// replaced — never the whole document.
+	function tfTitleBind() {
+		var el = document.querySelector("head > title") || document.querySelector("title");
+		if (el === tfTitle.el) return;
+		if (tfTitle.obs) tfTitle.obs.disconnect();
+		tfTitle.el = el;
+		if (!el) return;
+		tfTitle.obs = new MutationObserver(tfTitleSchedule);
+		tfTitle.obs.observe(el, { childList: true, characterData: true, subtree: true });
+	}
+
+	fullConversionParts.push({
+		setup: function () {
+			if (tfTitle.active) return;
+			tfTitle.active = true;
+			tfTitleBind();
+			if (document.head && !tfTitle.headObs) {
+				tfTitle.headObs = new MutationObserver(function () {
+					tfTitleBind();
+					tfTitleSchedule();
+				});
+				tfTitle.headObs.observe(document.head, { childList: true });
+			}
+			tfTitleSchedule();
+		},
+		teardown: function () {
+			tfTitle.active = false;
+			if (tfTitle.timer) clearTimeout(tfTitle.timer);
+			tfTitle.timer = null;
+			if (tfTitle.obs) tfTitle.obs.disconnect();
+			if (tfTitle.headObs) tfTitle.headObs.disconnect();
+			tfTitle.obs = tfTitle.headObs = tfTitle.el = null;
+			// Put Spotify's own last title back, but only if ours is still
+			// showing — if Spotify wrote a newer one meanwhile, keep that.
+			if (tfTitle.written !== null && document.title === tfTitle.written && tfTitle.original) {
+				document.title = tfTitle.original;
+			}
+			tfTitle.written = null;
+		}
+	});
+
+	// ---- 3. UI strings (Spicetify.Locale) ---------------------------------
+	// Spicetify.Locale._dictionary is Spotify's live i18n map (key → string,
+	// or key → { one, other } for plurals). Rewriting a value renames that
+	// string everywhere it's rendered from then on ("About Spotify" →
+	// "About terminal", "Spotify Connect" → "terminal Connect"...).
+	// Strings already on screen keep their text until React re-renders
+	// them (usually the next navigation), which is fine for a rename.
+	//
+	// Safety, since these strings are templates, not plain text:
+	//   - only text at brace depth 0 is touched, so "{0}", "{name}" and
+	//     ICU blocks like "{count, plural, one {…} other {…}}" keep their
+	//     exact shape (a "Spotify" inside a plural branch is left as is);
+	//   - case-sensitive "Spotify" as a whole word only, and never when a
+	//     domain follows ("Spotify.com", "spotify.com/premium") so link
+	//     text and URLs stay intact;
+	//   - only string values change type-for-type; a frozen dictionary or a
+	//     key that refuses the write is skipped, not forced;
+	//   - every original value is kept and written back on teardown.
+	var TF_BRAND_WORD = /\bSpotify\b(?!\.[A-Za-z])/g;
+
+	function tfRebrandTemplate(str) {
+		if (typeof str !== "string" || str.indexOf("Spotify") === -1) return str;
+		var out = "";
+		var depth = 0;
+		var chunk = "";
+		for (var i = 0; i < str.length; i++) {
+			var c = str.charAt(i);
+			if (c === "{" || c === "}") {
+				out += depth === 0 ? chunk.replace(TF_BRAND_WORD, "terminal") : chunk;
+				chunk = "";
+				depth = Math.max(0, depth + (c === "{" ? 1 : -1));
+				out += c;
+			} else {
+				chunk += c;
+			}
+		}
+		out += depth === 0 ? chunk.replace(TF_BRAND_WORD, "terminal") : chunk;
+		return out;
+	}
+
+	var tfLocale = { active: false, backup: null, dict: null };
+
+	function tfRebrandLocale() {
+		if (!tfLocale.active || tfLocale.backup) return;
+		var L = Spicetify.Locale;
+		var dict = L && L._dictionary;
+		if (!dict || typeof dict !== "object" || Object.isFrozen(dict)) return;
+		var backup = {};
+		for (var key in dict) {
+			if (!Object.prototype.hasOwnProperty.call(dict, key)) continue;
+			var v = dict[key];
+			var nv = v;
+			if (typeof v === "string") {
+				nv = tfRebrandTemplate(v);
+			} else if (v && typeof v === "object") {
+				var copy = null;
+				for (var form in v) {
+					if (!Object.prototype.hasOwnProperty.call(v, form) || typeof v[form] !== "string") continue;
+					var f = tfRebrandTemplate(v[form]);
+					if (f !== v[form]) {
+						copy = copy || assign({}, v);
+						copy[form] = f;
+					}
+				}
+				if (copy) nv = copy;
+			}
+			if (nv === v) continue;
+			try {
+				dict[key] = nv;
+				backup[key] = v;
+			} catch (e) {
+				/* read-only key — leave it */
+			}
+		}
+		tfLocale.backup = backup;
+		tfLocale.dict = dict;
+	}
+
+	fullConversionParts.push({
+		setup: function () {
+			tfLocale.active = true;
+			waitFor(
+				function () { return Spicetify.Locale && Spicetify.Locale._dictionary; },
+				tfRebrandLocale
+			);
+		},
+		teardown: function () {
+			tfLocale.active = false;
+			var dict = tfLocale.dict;
+			var backup = tfLocale.backup;
+			tfLocale.backup = tfLocale.dict = null;
+			if (!dict || !backup) return;
+			for (var key in backup) {
+				if (!Object.prototype.hasOwnProperty.call(backup, key)) continue;
+				try {
+					dict[key] = backup[key];
+				} catch (e) {
+					/* same key refused the first write too — nothing to undo */
+				}
+			}
+		}
+	});
+
+	// ---- 4. Idle window title (Spicetify.AppTitle) ------------------------
+	// When nothing plays, Spotify's title comes from ProductState "name"
+	// ("Spotify Premium"/"Spotify Free"). AppTitle.set overrides it and
+	// keeps re-asserting the override; reset() hands it back. Resolves
+	// only after UserAPI is up, hence the waitFor. The <title> observer in
+	// part 2 already covers this visually — this just stops Spotify from
+	// producing the branded string in the first place, so the taskbar
+	// doesn't flash "Spotify Premium" for 30ms on every pause.
+	var tfAppTitle = { active: false, applied: false };
+
+	fullConversionParts.push({
+		setup: function () {
+			tfAppTitle.active = true;
+			waitFor(
+				function () { return Spicetify.AppTitle && typeof Spicetify.AppTitle.set === "function"; },
+				function () {
+					if (!tfAppTitle.active || tfAppTitle.applied) return;
+					tfAppTitle.applied = true;
+					try {
+						var p = Spicetify.AppTitle.set("terminal");
+						if (p && typeof p.catch === "function") p.catch(function () { tfAppTitle.applied = false; });
+					} catch (e) {
+						tfAppTitle.applied = false;
+					}
+				}
+			);
+		},
+		teardown: function () {
+			tfAppTitle.active = false;
+			if (!tfAppTitle.applied) return;
+			tfAppTitle.applied = false;
+			try {
+				var p = Spicetify.AppTitle.reset();
+				if (p && typeof p.catch === "function") p.catch(function () {});
+			} catch (e) {
+				/* AppTitle gone — Spotify restores its own title on next launch */
+			}
+		}
+	});
+
+	// ---- Mode switch (both modes) ------------------------------------------
+	// One function behind the palette command, the keyboard shortcut and
+	// (indirectly, through the same setting) the settings-panel row.
+	function tfSetFullMode(on) {
+		settings.fullConversion = !!on;
+		saveSettings();
+		applyFullConversionSetting();
+		// Keep an open settings panel honest: its first-registry-order row
+		// is the fullConversion checkbox (rows are built from
+		// FEATURE_REGISTRY in order).
+		var idx = -1;
+		for (var i = 0; i < FEATURE_REGISTRY.length; i++) {
+			if (FEATURE_REGISTRY[i].key === "fullConversion") idx = i;
+		}
+		var rows = document.querySelectorAll(".terminal-settings > .terminal-settings-row");
+		var cb = idx >= 0 && rows[idx] && rows[idx].querySelector("input[type=\"checkbox\"]");
+		if (cb) cb.checked = !!on;
+		return tfModeLabel();
+	}
+
+	function tfModeLabel() {
+		return settings.fullConversion
+			? "mode terminal complet : activé"
+			: "mode natif (thème classique) : activé";
+	}
+
+	function tfShortcutLabel() {
+		return currentOs === "mac" ? "cmd+maj+alt+n" : "ctrl+maj+alt+n";
+	}
+
+	function tfNotify(msg) {
+		try {
+			if (typeof Spicetify.showNotification === "function") Spicetify.showNotification(msg);
+		} catch (e) {
+			/* no toast API yet — the mode switch itself already happened */
+		}
+	}
+
+	// Escape hatch: Ctrl+Shift+Alt+N (Cmd+Shift+Alt+N or Ctrl+… on macOS)
+	// flips the mode from anywhere, including when full mode has made
+	// something hard to reach. Clash check:
+	//   - Spotify binds Ctrl+N (new playlist) and Ctrl+Shift+N (new
+	//     folder); its Mousetrap matches modifiers exactly, so the extra
+	//     Alt keeps this combo distinct from both.
+	//   - No Windows, GNOME/KDE/Xfce or macOS system default uses it.
+	//   - Windows reports AltGr as Ctrl+Alt, and AltGr+Shift+N types a
+	//     letter on some layouts (Polish "Ń"). Chromium on Windows also
+	//     reports AltGraph for a plain left Ctrl+Alt, so the AltGraph
+	//     state can't be used to tell the two apart (it made the shortcut
+	//     unreachable there). Instead, off macOS, the combo only counts
+	//     when it still produces a plain "n": a layout where it types
+	//     another character is left alone. Text fields are ignored too,
+	//     so typing is never hijacked.
+	// Registered once, outside the setup/teardown parts, because it has to
+	// work in native mode too — that's how you come back.
+	document.addEventListener("keydown", function (e) {
+		if (e.code !== "KeyN" || !e.shiftKey || !e.altKey || e.repeat) return;
+		var mod = currentOs === "mac" ? e.metaKey || e.ctrlKey : e.ctrlKey && !e.metaKey;
+		if (!mod) return;
+		if (currentOs !== "mac" && typeof e.key === "string" && e.key.length === 1 && e.key.toLowerCase() !== "n") return;
+		if (isTypingContext()) return;
+		e.preventDefault();
+		tfNotify(tfSetFullMode(!settings.fullConversion) + " (" + tfShortcutLabel() + " pour basculer)");
+	});
+
+	// Palette: `mode full` / `mode native` / `mode toggle` / `mode`.
+	// COMMANDS is a `var` assigned further down this file, so it's still
+	// undefined while this section runs; waitFor's first retry (200ms)
+	// finds it. Adds a key and wraps `help` rather than editing the
+	// COMMANDS literal, so the palette section stays untouched.
+	waitFor(
+		function () { return typeof COMMANDS === "object" && COMMANDS && typeof COMMANDS.help === "function"; },
+		function () {
+			if (COMMANDS.mode) return;
+			COMMANDS.mode = function (arg) {
+				var a = String(arg || "").trim().toLowerCase();
+				var usage = "usage: mode <full|native|toggle>  (raccourci " + tfShortcutLabel() + ")";
+				if (!a || a === "status") return tfModeLabel() + "\n" + usage;
+				if (/^(full|complet|terminal|on)$/.test(a)) return tfSetFullMode(true);
+				if (/^(native|natif|classic|classique|off)$/.test(a)) return tfSetFullMode(false);
+				if (a === "toggle") return tfSetFullMode(!settings.fullConversion);
+				return usage;
+			};
+			var baseHelp = COMMANDS.help;
+			COMMANDS.help = function () {
+				return baseHelp.apply(this, arguments) + " · mode <full|native>";
+			};
+		}
+	);
+
+	// --- END FULL/CHROME ---------------------------------------------------
+
+	// =======================================================================
 	// Mini player ("lecteur réduit") — Spotify opens this via the Document
 	// Picture-in-Picture API (window.documentPictureInPicture), which is a
 	// genuinely separate top-level document with its own stylesheets
@@ -1205,6 +2478,11 @@
 			"img.main-image-image, [data-encore-id=\"buttonPrimary\"] { border-radius: 0 !important; }",
 			".x-progressBar-progressFillColor, .x-progressBar-fillColor { background-color: #5ebdab !important; }"
 		].join("\n");
+		// Full conversion: the mini player is a separate document that
+		// user.css never reaches, so it gets the status-line styling here.
+		if (document.documentElement.classList.contains("terminal-full") && typeof FULL_PLAYER_PIP_CSS === "string") {
+			style.textContent += "\n" + FULL_PLAYER_PIP_CSS;
+		}
 		win.document.head.appendChild(style);
 	}
 
@@ -1518,8 +2796,14 @@
 			return targets;
 		}
 
+		// ~30 fps is plenty for bars driven by 1/10 s analysis segments and
+		// halves the per-frame DOM query + canvas work on weaker machines.
+		var lastVisFrame = 0;
 		function draw() {
 			rafId = requestAnimationFrame(draw);
+			var nowT = performance.now();
+			if (nowT - lastVisFrame < 32) return;
+			lastVisFrame = nowT;
 			if (document.hidden || REDUCED_MOTION || !settings.visualizer) {
 				var stale = document.querySelector(".terminal-visualizer");
 				if (stale && !settings.visualizer) stale.parentNode.removeChild(stale);
@@ -1683,7 +2967,7 @@
 		// unready when this runs.
 		waitFor(
 			function () { return Spicetify.Platform && Spicetify.Platform.History && Spicetify.Platform.History.listen; },
-			function () { Spicetify.Platform.History.listen(clearVimCursor); }
+			function () { Spicetify.Platform.History.listen(clearVimCursor); } // cheap (one class), kept synchronous so Enter never hits a stale row
 		);
 
 		document.addEventListener("keydown", function (e) {

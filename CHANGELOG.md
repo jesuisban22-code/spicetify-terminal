@@ -5,6 +5,33 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-09-25
+
+### Added
+
+- **Full terminal mode** ("mode terminal complet", on by default): the whole
+  client is re-skinned as a terminal OS. Everything lives under
+  `html.terminal-full`; turning it off restores the 1.2.0 look exactly.
+  - Layout: square tmux-style panes `[0:~/library]` `[1:~/<page>]`
+    `[2:now-playing]` with a live route title and focus highlight; the top bar
+    becomes a `user@terminal:~/…$` prompt with a command-line search field;
+    the library becomes a file tree with `[playlists]`-style tabs.
+  - Player: the bottom bar becomes a tmux status line — `[ ▶ ]` / `[ ❚❚ ]`,
+    block-style seek and volume bars (still native and draggable), labelled
+    glyph buttons, mode tag; right sidebar, lyrics (`> ` lines), fullscreen
+    and the mini player follow.
+  - Pages: home shelves as `$ ls ~/…` listings, bracket filter tabs, square
+    cards, monochrome browse tiles, `key: value` headers, `ls -l` tracklists,
+    config-file settings page; no Spotify green left in Encore colour sets.
+  - Chrome: context menus, tooltips, dialogs as terminal windows; toasts as
+    `[ok]` / `[err]` log lines.
+  - Branding: window title (`♪ Title — Artist · terminal`), in-app "Spotify"
+    strings, logos and Premium upsell buttons are replaced or hidden while the
+    mode is on (the app icon, login screen and OS media controls are outside a
+    theme's reach).
+  - Switching: settings row, palette `mode full` / `mode native`, and
+    `Ctrl+Shift+Alt+N` (`Cmd+Shift+Alt+N` on macOS).
+
 ## [1.2.0] - 2026-09-25
 
 ### Added
@@ -127,6 +154,7 @@ Initial release (Linux).
   the progress bar, vim-style keyboard navigation, themed mini-player.
 - Settings panel to toggle every feature individually.
 
+[2.0.0]: https://github.com/jesuisban22-code/spicetify-terminal/compare/v1.2.0...v2.0.0
 [1.2.0]: https://github.com/jesuisban22-code/spicetify-terminal/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/jesuisban22-code/spicetify-terminal/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/jesuisban22-code/spicetify-terminal/compare/v1.1.0...v1.1.1
