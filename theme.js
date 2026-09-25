@@ -1718,8 +1718,10 @@
 		var parts = raw.replace(/^\//, "").split(/\s+/);
 		var cmd = parts[0].toLowerCase();
 		var arg = parts.slice(1).join(" ");
-		var handler = COMMANDS[cmd];
-		if (!handler) {
+		// Own-property check so Object.prototype members (constructor,
+		// __proto__, toString...) aren't treated as commands.
+		var handler = Object.prototype.hasOwnProperty.call(COMMANDS, cmd) ? COMMANDS[cmd] : null;
+		if (typeof handler !== "function") {
 			print("command not found: " + cmd, "err");
 			return;
 		}
