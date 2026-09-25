@@ -1,0 +1,35 @@
+name: Feature request
+description: Suggest an idea, a new palette command or an improvement for the Terminal theme.
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea! Tu peux écrire en français ou en anglais.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like?
+      description: Describe the feature and the problem it solves.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: How could it work?
+      description: "For example: a new command palette command, a settings option, a visual effect."
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or references
+      description: Other themes, tools or screenshots that show what you have in mind.
+  - type: dropdown
+    id: os
+    attributes:
+      label: Which OS do you use?
+      multiple: true
+      options:
+        - Linux
+        - Windows
+        - macOS
