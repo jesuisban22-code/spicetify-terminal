@@ -1206,6 +1206,212 @@
 	}
 
 	// --- FULL/SHELL: layout, top bar, library (agent A) -------------------
+	// The shell itself (tmux-style panes, prompt top bar, file-tree
+	// library) is pure CSS under html.terminal-full. The only thing CSS
+	// can't know is *where* the user is and *who* they are, so this part
+	// publishes two strings as custom properties on <html>, read by
+	// `content: var(...)` in user.css:
+	//   --tf-main-title  "[1:~/playlist/Chill Mix]"  main pane title bar
+	//   --tf-prompt      "hugo@terminal:~/playlist$"  top-bar prompt
+	// Custom properties on <html> rather than data-* attributes on
+	// Spotify's own nodes on purpose: React re-creates .Root__main-view /
+	// the global nav subtree on some layout changes, which would silently
+	// drop an attribute, while <html> is never re-rendered. It also keeps
+	// teardown trivial (two removeProperty calls) and touches zero native
+	// DOM.
+	//
+	// Cost: one History.listen callback per navigation plus at most four
+	// short timed re-reads of the page name (Spotify renders the new page's
+	// heading a few frames after the route changes). No MutationObserver.
+	var shellState = { on: false, unlisten: null, keptListener: false, timers: [], navSeq: 0, lastName: "" };
+
+	// Routes whose second segment is an opaque id that reads better as the
+	// page's own name: /playlist/37i9dQZF1DX... -> ~/playlist/Chill Mix.
+	var SHELL_NAMED_ROUTES = {
+		playlist: 1, album: 1, artist: 1, show: 1, episode: 1, user: 1,
+		genre: 1, track: 1, audiobook: 1, concert: 1, prerelease: 1
+	};
+
+	// Friendlier names for a few top-level routes whose raw path would be
+	// cryptic (collection/tracks is Liked Songs, preferences is Settings).
+	var SHELL_ROUTE_ALIASES = {
+		"collection/tracks": "~/liked-songs",
+		"collection/episodes": "~/episodes",
+		"collection": "~/library",
+		"preferences": "~/settings",
+		"lyrics": "~/lyrics",
+		"queue": "~/queue"
+	};
+
+	// Quote a JS string as a CSS <string> for `content:`. Backslashes and
+	// quotes are escaped; newlines collapse to spaces (a raw newline would
+	// end the string and invalidate the whole declaration).
+	function shellCssString(s) {
+		return '"' + String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/[\r\n]+/g, " ") + '"';
+	}
+
+	function shellClip(s, max) {
+		s = String(s || "").replace(/\s+/g, " ").trim();
+		return s.length > max ? s.slice(0, max - 1) + "…" : s;
+	}
+
+	// Current page's human name. Spotify labels its <main> landmark
+	// "Spotify – <page name>" on every route (see the main[tabindex="-1"]
+	// note near :focus-visible in user.css) — the cheapest, locale-correct
+	// source. The page's own <h1> is the fallback.
+	function shellPageName() {
+		var name = "";
+		try {
+			var main = document.querySelector(".Root__main-view main[aria-label]") || document.querySelector("main[aria-label]");
+			if (main) name = main.getAttribute("aria-label") || "";
+			name = name.replace(/^\s*Spotify\s*[\u2013\u2014\-:|]\s*/i, "");
+			if (/^spotify$/i.test(name.trim())) name = "";
+			if (!name) {
+				var h1 = document.querySelector(".Root__main-view h1");
+				if (h1) name = h1.textContent || "";
+			}
+		} catch (e) {
+			name = "";
+		}
+		return shellClip(name, 40);
+	}
+
+	function shellSafeDecode(s) {
+		try {
+			return decodeURIComponent(s);
+		} catch (e) {
+			return s;
+		}
+	}
+
+	// pathname -> { dir: "~/playlist", path: "~/playlist/Chill Mix" }.
+	// `dir` (first segment only) feeds the short top-bar prompt, `path`
+	// the main pane title.
+	function shellRoute(pathname, pageName) {
+		var segs = String(pathname || "/").split(/[?#]/)[0].split("/").filter(Boolean).map(shellSafeDecode);
+		if (!segs.length) return { dir: "~/home", path: "~/home" };
+		var two = segs.slice(0, 2).join("/");
+		if (SHELL_ROUTE_ALIASES[two]) return { dir: SHELL_ROUTE_ALIASES[two], path: SHELL_ROUTE_ALIASES[two] };
+		var kind = segs[0];
+		if (SHELL_ROUTE_ALIASES[kind] && segs.length === 1) return { dir: SHELL_ROUTE_ALIASES[kind], path: SHELL_ROUTE_ALIASES[kind] };
+		var dir = "~/" + shellClip(kind, 20);
+		if (SHELL_NAMED_ROUTES[kind]) {
+			// Ids are opaque; the page's own name is what the user recognizes.
+			// Extra segments after the id (e.g. /artist/<id>/discography) are
+			// kept as a readable suffix.
+			var tail = segs.slice(2).join("/");
+			var shown = pageName || (segs[1] ? shellClip(segs[1], 12) : "");
+			return { dir: dir, path: shellClip(dir + (shown ? "/" + shown : "") + (tail ? "/" + tail : ""), 64) };
+		}
+		// search/<query>/<tab> and friends are already human-readable.
+		return { dir: dir, path: shellClip("~/" + segs.join("/"), 64) };
+	}
+
+	function shellUserName() {
+		var n = currentDisplayName();
+		// Shell-style login: lower case, no spaces ("Hugo Ban" -> hugo-ban).
+		n = String(n).toLowerCase().replace(/\s+/g, "-").replace(/[^\w.\-\u00C0-\u024F]/g, "");
+		return shellClip(n || "user", 20);
+	}
+
+	function shellCurrentPath() {
+		try {
+			var loc = Spicetify.Platform && Spicetify.Platform.History && Spicetify.Platform.History.location;
+			if (loc && typeof loc.pathname === "string") return loc.pathname;
+		} catch (e) {
+			/* History not ready — fall through to home */
+		}
+		return "/";
+	}
+
+	function shellApplyTitles(pathname, pageName) {
+		if (!shellState.on) return;
+		var route = shellRoute(pathname, pageName);
+		var root = document.documentElement.style;
+		root.setProperty("--tf-main-title", shellCssString("[1:" + route.path + "]"));
+		root.setProperty("--tf-prompt", shellCssString(shellUserName() + "@terminal:" + route.dir + "$"));
+		root.setProperty("--tf-prompt-short", shellCssString(route.dir + "$"));
+	}
+
+	function shellClearTimers() {
+		for (var i = 0; i < shellState.timers.length; i++) clearTimeout(shellState.timers[i]);
+		shellState.timers = [];
+	}
+
+	// Title right away from the path alone (never shows a stale name), then
+	// re-read the page name a few times as the new page mounts. A name equal
+	// to the previous page's is treated as "not rendered yet" except on the
+	// last attempt (two pages can legitimately share a name).
+	function shellOnNavigate(pathname) {
+		if (!shellState.on) return;
+		shellClearTimers();
+		var seq = ++shellState.navSeq;
+		var previousName = shellState.lastName || "";
+		shellApplyTitles(pathname, "");
+		var kind = String(pathname || "").split("/").filter(Boolean)[0];
+		if (!SHELL_NAMED_ROUTES[kind]) {
+			shellState.lastName = "";
+			return;
+		}
+		var delays = [120, 400, 1000, 2400];
+		delays.forEach(function (ms, i) {
+			shellState.timers.push(setTimeout(function () {
+				if (!shellState.on || seq !== shellState.navSeq) return;
+				var name = shellPageName();
+				var last = i === delays.length - 1;
+				if (!name || (name === previousName && !last)) return;
+				shellState.lastName = name;
+				shellApplyTitles(pathname, name);
+			}, ms));
+		});
+	}
+
+	function setupFullShell() {
+		if (shellState.on) return; // setup can run again on every toggle-on
+		shellState.on = true;
+		shellOnNavigate(shellCurrentPath());
+		waitFor(
+			function () { return Spicetify.Platform && Spicetify.Platform.History && Spicetify.Platform.History.listen; },
+			function () {
+				// Torn down (or re-set-up) while we were still waiting.
+				if (!shellState.on || shellState.unlisten || shellState.keptListener) return;
+				var off = Spicetify.Platform.History.listen(function (location) {
+					if (!shellState.on) return;
+					shellOnNavigate((location && location.pathname) || (location && location.location && location.location.pathname) || shellCurrentPath());
+				});
+				// history v4/v5 return an unlisten function. Should a build
+				// ever not, the listener stays attached but inert (it checks
+				// shellState.on first) and is never attached a second time.
+				if (typeof off === "function") shellState.unlisten = off;
+				else shellState.keptListener = true;
+				// The display name may only have been ready now.
+				shellOnNavigate(shellCurrentPath());
+			}
+		);
+	}
+
+	function teardownFullShell() {
+		shellState.on = false;
+		shellState.navSeq++;
+		shellClearTimers();
+		if (shellState.unlisten) {
+			try {
+				shellState.unlisten();
+			} catch (e) {
+				/* already detached */
+			}
+		}
+		shellState.unlisten = null;
+		shellState.lastName = "";
+		var root = document.documentElement.style;
+		root.removeProperty("--tf-main-title");
+		root.removeProperty("--tf-prompt");
+		root.removeProperty("--tf-prompt-short");
+		// Leave <html> exactly as we found it: no empty style="" behind.
+		if (document.documentElement.getAttribute("style") === "") document.documentElement.removeAttribute("style");
+	}
+
+	fullConversionParts.push({ setup: setupFullShell, teardown: teardownFullShell });
 	// --- END FULL/SHELL ----------------------------------------------------
 
 	// --- FULL/PLAYER: status line, right sidebar, fullscreen (agent B) ----
