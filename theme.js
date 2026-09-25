@@ -85,6 +85,13 @@
 	// below, same as before.
 	// ---------------------------------------------------------------------
 	var FEATURE_REGISTRY = [
+		{
+			key: "fullConversion",
+			label: "mode terminal complet (interface entièrement refaite)",
+			default: true,
+			setup: function () { setupFullConversion(); },
+			onToggle: function () { applyFullConversionSetting(); }
+		},
 		{ key: "boot", label: "séquence de démarrage au lancement", default: true },
 		{ key: "pulse", label: "pulsation lecture en cours (couleur + tempo)", default: true, setup: function () { setupNowPlayingPulse(); }, onToggle: function () { applyPulseVisuals(); } },
 		{ key: "transitions", label: "transitions de page", default: true, setup: function () { setupPageTransitions(); } },
@@ -148,6 +155,9 @@
 	}
 
 	var settings = loadSettings();
+	// Tag <html> right away so the full-conversion CSS applies from the
+	// first paint instead of flashing the native UI until Spicetify is ready.
+	document.documentElement.classList.toggle("terminal-full", !!settings.fullConversion);
 
 	// ---------------------------------------------------------------------
 	// Readiness poll — the pattern used by every extension already installed
@@ -1163,6 +1173,47 @@
 	function applyCrtSetting() {
 		document.documentElement.classList.toggle("terminal-crt-enabled", !!settings.crtScanlines);
 	}
+
+	// =======================================================================
+	// Full conversion ("mode terminal complet") — re-skins the whole client
+	// so it reads as a terminal OS instead of Spotify. Every rule lives
+	// under html.terminal-full in user.css; this section only adds what CSS
+	// can't do on its own. Turning the setting off removes the class and
+	// calls each part's teardown, restoring the v1.2.0 look exactly.
+	// Native Spotify nodes are never moved or removed — only restyled,
+	// annotated (data-* / classes) or overlaid — so playback, menus and
+	// Spicetify APIs that click native buttons keep working.
+	// =======================================================================
+	var fullConversionParts = []; // { setup: fn, teardown: fn } registered below
+
+	function setupFullConversion() {
+		applyFullConversionSetting();
+	}
+
+	function applyFullConversionSetting() {
+		var on = !!settings.fullConversion;
+		document.documentElement.classList.toggle("terminal-full", on);
+		fullConversionParts.forEach(function (part) {
+			try {
+				if (on) part.setup();
+				else if (part.teardown) part.teardown();
+			} catch (e) {
+				/* one part failing must not take the others (or the app) down */
+			}
+		});
+	}
+
+	// --- FULL/SHELL: layout, top bar, library (agent A) -------------------
+	// --- END FULL/SHELL ----------------------------------------------------
+
+	// --- FULL/PLAYER: status line, right sidebar, fullscreen (agent B) ----
+	// --- END FULL/PLAYER ---------------------------------------------------
+
+	// --- FULL/PAGES: home, search, headers, tracklists (agent C) ----------
+	// --- END FULL/PAGES ----------------------------------------------------
+
+	// --- FULL/CHROME: overlays, branding, page tags (agent D) -------------
+	// --- END FULL/CHROME ---------------------------------------------------
 
 	// =======================================================================
 	// Mini player ("lecteur réduit") — Spotify opens this via the Document

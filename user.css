@@ -996,3 +996,32 @@ html.terminal-os-mac .terminal-drag-strip {
 html.terminal-os-mac #terminal-boot-overlay.terminal-boot-hide .terminal-drag-strip {
   display: none;
 }
+
+/* ==========================================================================
+   FULL CONVERSION — "mode terminal complet" (settings.fullConversion).
+   Every rule below is scoped under html.terminal-full so turning the
+   setting off restores the v1.2.0 look exactly. Shared tokens first; each
+   region has its own section.
+   ========================================================================== */
+html.terminal-full {
+  --tf-gap: 6px;              /* gutter between panes */
+  --tf-pane-border: 1px solid var(--term-border);
+  --tf-pane-border-active: 1px solid var(--term-green);
+  --tf-title-h: 22px;         /* pane title bar height */
+  --tf-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --tf-fast: 120ms;
+  --tf-med: 200ms;
+  --tf-slow: 320ms;
+}
+
+/* --- FULL/SHELL (agent A) ------------------------------------------------ */
+/* --- END FULL/SHELL ------------------------------------------------------ */
+
+/* --- FULL/PLAYER (agent B) ----------------------------------------------- */
+/* --- END FULL/PLAYER ----------------------------------------------------- */
+
+/* --- FULL/PAGES (agent C) ------------------------------------------------ */
+/* --- END FULL/PAGES ------------------------------------------------------ */
+
+/* --- FULL/CHROME (agent D) ----------------------------------------------- */
+/* --- END FULL/CHROME ----------------------------------------------------- */
