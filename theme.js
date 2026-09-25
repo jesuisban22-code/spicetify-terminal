@@ -1634,14 +1634,72 @@
 	}
 
 	function setupVimNav() {
-		Spicetify.Player.addEventListener("appchange", function () {
+		// The highlighted row element itself, not just its index. The index
+		// alone went stale on navigation: after j,j on one playlist, Enter on
+		// the next one played rows[1] there — a row that was never
+		// highlighted. Holding the element lets Enter check that the row is
+		// still in the DOM and still carries the cursor class before acting.
+		var vimRow = null;
+
+		function clearVimCursor() {
 			vimIndex = -1;
-		});
+			vimRow = null;
+			var marked = document.querySelectorAll(".terminal-vim-cursor");
+			for (var i = 0; i < marked.length; i++) marked[i].classList.remove("terminal-vim-cursor");
+		}
+
+		// Returns the highlighted row only if it's still live: connected to
+		// the document (React unmounts rows on route change and when the
+		// virtualized list scrolls them out) and still marked. Anything else
+		// means "no selection", and the stale state is dropped.
+		function currentVimRow() {
+			if (vimRow && vimRow.isConnected && vimRow.classList.contains("terminal-vim-cursor")) return vimRow;
+			if (vimRow || vimIndex !== -1) clearVimCursor();
+			return null;
+		}
+
+		// Enter on a focused button/link/control must keep its native
+		// meaning (activate that control), so the Enter handler stands down
+		// whenever focus is on anything interactive. isTypingContext only
+		// covers text fields; this is broader.
+		var INTERACTIVE_SELECTOR =
+			"button, a[href], input, textarea, select, summary, [contenteditable]:not([contenteditable=\"false\"]), " +
+			"[role=\"button\"], [role=\"link\"], [role=\"textbox\"], [role=\"searchbox\"], [role=\"combobox\"], " +
+			"[role=\"menuitem\"], [role=\"menuitemcheckbox\"], [role=\"menuitemradio\"], [role=\"option\"], " +
+			"[role=\"checkbox\"], [role=\"radio\"], [role=\"switch\"], [role=\"slider\"], [role=\"tab\"], [role=\"spinbutton\"]";
+
+		function isInteractiveFocus() {
+			var el = document.activeElement;
+			if (!el || el === document.body || el === document.documentElement) return false;
+			if (el.isContentEditable) return true;
+			return !!(el.closest && el.closest(INTERACTIVE_SELECTOR));
+		}
+
+		Spicetify.Player.addEventListener("appchange", clearVimCursor);
+
+		// appchange doesn't fire for ordinary in-app navigation (playlist ->
+		// playlist), so also reset on every History route change. Same
+		// waitFor pattern as setupAsciiCoverArt: Platform.History can still be
+		// unready when this runs.
+		waitFor(
+			function () { return Spicetify.Platform && Spicetify.Platform.History && Spicetify.Platform.History.listen; },
+			function () { Spicetify.Platform.History.listen(clearVimCursor); }
+		);
 
 		document.addEventListener("keydown", function (e) {
 			if (paletteOverlay || isTypingContext()) return;
+			// Someone else already handled it, or an IME is mid-composition
+			// (keyCode 229 covers Chromium builds that don't set isComposing
+			// on the first keydown).
+			if (e.defaultPrevented || e.isComposing || e.keyCode === 229) return;
+			// Never hijack shortcuts: Ctrl+K is Spotify's quick search, and
+			// Ctrl/Cmd/Alt + J/K/Enter/"/" belong to Spotify or the OS.
+			// metaKey is Cmd on macOS and the Win key on Windows. Windows
+			// also reports AltGr as Ctrl+Alt, which this rules out too.
+			if (e.ctrlKey || e.metaKey || e.altKey) return;
 
 			if (e.key === "/") {
+				// Shift is allowed here: AZERTY types "/" as Shift+":".
 				var search = document.querySelector(".main-topBar-searchBar, [data-testid=\"search-input\"]");
 				if (search) {
 					e.preventDefault();
@@ -1650,12 +1708,14 @@
 				return;
 			}
 
+			if (e.shiftKey) return;
 			if (e.key !== "j" && e.key !== "k" && e.key !== "Enter") return;
-			var rows = document.querySelectorAll(".main-trackList-trackListRow");
-			if (!rows.length) return;
 
 			if (e.key === "Enter") {
-				var current = rows[vimIndex];
+				// Only act on a row that is visibly highlighted right now, and
+				// never steal Enter from a focused control.
+				if (isInteractiveFocus()) return;
+				var current = currentVimRow();
 				if (current) {
 					e.preventDefault();
 					current.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true }));
@@ -1663,14 +1723,21 @@
 				return;
 			}
 
+			var rows = document.querySelectorAll(".main-trackList-trackListRow");
+			if (!rows.length) return;
+
+			// Recompute the position from the live element; "no selection"
+			// (or a stale row) starts at the first row for both j and k.
+			var live = currentVimRow();
+			var from = live ? Array.prototype.indexOf.call(rows, live) : -1;
+			var next = from === -1 ? 0 : Math.max(0, Math.min(rows.length - 1, from + (e.key === "j" ? 1 : -1)));
+
 			e.preventDefault();
-			vimIndex = Math.max(0, Math.min(rows.length - 1, vimIndex + (e.key === "j" ? 1 : -1)));
-			rows.forEach(function (r) {
-				r.classList.remove("terminal-vim-cursor");
-			});
-			var row = rows[vimIndex];
-			row.classList.add("terminal-vim-cursor");
-			row.scrollIntoView({ block: "nearest" });
+			clearVimCursor();
+			vimIndex = next;
+			vimRow = rows[next];
+			vimRow.classList.add("terminal-vim-cursor");
+			vimRow.scrollIntoView({ block: "nearest" });
 		});
 	}
 
