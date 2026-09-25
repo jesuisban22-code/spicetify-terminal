@@ -1,0 +1,78 @@
+name: Bug report
+description: Something in the Terminal theme doesn't work or looks wrong.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Before opening, please try `spicetify apply` (or `spicetify restore backup apply` after a Spotify update) and check the FAQ in the README.
+        Merci ! Tu peux écrire en français ou en anglais.
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Linux
+        - Windows
+        - macOS
+    validations:
+      required: true
+  - type: input
+    id: os-details
+    attributes:
+      label: OS version / distro
+      placeholder: "e.g. Windows 11 23H2, Ubuntu 24.04, Arch"
+  - type: input
+    id: spotify-version
+    attributes:
+      label: Spotify version
+      description: "Spotify > Settings > About (or Help > About Spotify)."
+      placeholder: "e.g. 1.2.50.335"
+    validations:
+      required: true
+  - type: input
+    id: spicetify-version
+    attributes:
+      label: Spicetify version
+      description: "Output of `spicetify -v`."
+      placeholder: "e.g. 2.38.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: How did you install the theme?
+      options:
+        - Spicetify Marketplace
+        - Manual (git clone)
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: What you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open Spotify
+        2. Press Ctrl+Shift+K
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot or recording
+      description: Drag and drop an image or video here if it helps.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console errors (optional)
+      description: "If you run Spotify with devtools (`spicetify enable-devtools`), paste any errors mentioning theme.js."
+      render: text

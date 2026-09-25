@@ -1,11 +1,11 @@
 {
   "name": "Terminal",
-  "description": "Thème hacker/terminal pour Spotify — séquence de démarrage, palette de commandes façon shell, pochettes converties en ASCII, pluie matrix, visualiseur audio synchronisé en temps réel sur les vraies données du morceau.",
+  "description": "Hacker/terminal theme for Spotify on Windows and Linux: boot sequence, shell-style command palette (Ctrl+Shift+K), live ASCII-art album covers, matrix rain screensaver, and an audio visualizer driven by the track's real audio analysis.",
   "preview": "screenshots/home.png",
+  "readme": "README.md",
   "usercss": "user.css",
   "schemes": "color.ini",
-  "readme": "README.md",
   "include": ["https://cdn.jsdelivr.net/gh/jesuisban22-code/spicetify-terminal@main/theme.js"],
   "authors": [{ "name": "jesuisban22-code", "url": "https://github.com/jesuisban22-code" }],
-  "tags": ["Dark", "Terminal", "Hacker", "Animated"]
+  "tags": ["dark", "terminal", "hacker", "animated", "ascii"]
 }

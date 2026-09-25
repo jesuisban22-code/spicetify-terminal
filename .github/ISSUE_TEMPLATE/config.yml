@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Spicetify documentation
+    url: https://spicetify.app/docs/getting-started
+    about: Problems installing or running Spicetify itself (not this theme).

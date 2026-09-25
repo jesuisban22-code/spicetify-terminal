@@ -20,6 +20,17 @@
 
 	var SESSION_START = Date.now();
 
+	// Same stack as --term-font in user.css — keep the two in sync. The
+	// injected mini-player CSS can't read that variable (it lives in a
+	// separate document), hence the copy. Order matters: the Linux fonts
+	// (JetBrains Mono → DejaVu Sans Mono) come first so a Linux machine
+	// resolves exactly the same face it always has, even if it happens to
+	// have Cascadia installed; Cascadia/Consolas only get reached on
+	// Windows (Menlo on macOS), where none of the Linux faces exist.
+	var TERM_FONT_STACK =
+		"'JetBrains Mono', 'Fira Code', 'Hack', 'DejaVu Sans Mono', " +
+		"'Cascadia Mono', 'Cascadia Code', 'Consolas', 'Menlo', monospace";
+
 	// Real logged-in display name for the palette's `whoami`/`neofetch`/
 	// `sudo` easter egg — reads the actual Spicetify session instead of a
 	// hardcoded name, so it shows *this* user's own account on every
@@ -147,6 +158,78 @@
 		}, 200);
 	}
 
+	// ---------------------------------------------------------------------
+	// Platform detection — tags <html> with exactly one of
+	// terminal-os-windows / terminal-os-linux / terminal-os-mac so user.css
+	// can scope OS-specific fixes (Windows' in-page window buttons and
+	// title-bar drag region) without touching how any other OS renders.
+	// The theme was built on Linux, where native window decorations sit
+	// outside the page entirely; every Windows-only rule in user.css is
+	// gated on html.terminal-os-windows, so Linux (and an OS we fail to
+	// identify, which gets no class at all) stays pixel-identical.
+	//
+	// Sources, most to least authoritative:
+	//   1. Spicetify.Platform.operatingSystem — what Spotify itself reports
+	//      (also shown by the palette's `neofetch`), but Platform may not
+	//      exist yet at the very first line of this file.
+	//   2. Spotify's own body class (spotify__os--is-windows etc.), set by
+	//      the desktop client before its React tree mounts.
+	//   3. navigator.userAgent / navigator.platform — always available, so
+	//      the boot overlay (which runs synchronously below) already gets
+	//      the right class on its first paint.
+	// We apply the best answer immediately, then re-evaluate once Platform
+	// is ready in case an earlier fallback guessed differently.
+	// ---------------------------------------------------------------------
+	var OS_CLASSES = { windows: "terminal-os-windows", linux: "terminal-os-linux", mac: "terminal-os-mac" };
+	var currentOs = "unknown";
+
+	// Maps any free-form OS string onto windows/linux/mac. Mac is tested
+	// before Windows on purpose: "Darwin" contains the substring "win".
+	function normalizeOs(s) {
+		s = String(s || "").toLowerCase();
+		if (!s) return "unknown";
+		if (/mac|os ?x|darwin/.test(s)) return "mac";
+		if (/win/.test(s)) return "windows";
+		if (/linux|x11|cros/.test(s)) return "linux";
+		return "unknown";
+	}
+
+	function detectOs() {
+		var os = "unknown";
+		try {
+			os = normalizeOs(Spicetify.Platform && Spicetify.Platform.operatingSystem);
+		} catch (e) {
+			/* Spicetify global not there yet — fall through */
+		}
+		if (os !== "unknown") return os;
+		try {
+			var m = document.body && /(?:^|\s)spotify__os--is-([a-z]+)/.exec(document.body.className);
+			if (m) os = normalizeOs(m[1]);
+		} catch (e) {
+			/* no body yet — fall through */
+		}
+		if (os !== "unknown") return os;
+		return normalizeOs(navigator.platform) !== "unknown"
+			? normalizeOs(navigator.platform)
+			: normalizeOs(navigator.userAgent);
+	}
+
+	function applyOsClass() {
+		currentOs = detectOs();
+		var root = document.documentElement;
+		for (var k in OS_CLASSES) {
+			if (Object.prototype.hasOwnProperty.call(OS_CLASSES, k)) {
+				root.classList.toggle(OS_CLASSES[k], k === currentOs);
+			}
+		}
+	}
+
+	applyOsClass();
+	waitFor(
+		function () { return window.Spicetify && Spicetify.Platform && Spicetify.Platform.operatingSystem; },
+		applyOsClass
+	);
+
 	// =======================================================================
 	// A. Boot sequence — the one bold, non-user-triggered moment. Pure DOM,
 	//    zero Spicetify dependency, so it can run on the very first paint.
@@ -171,6 +254,12 @@
 
 		var overlay = document.createElement("div");
 		overlay.id = "terminal-boot-overlay";
+
+		// Window-drag handle for Windows' in-app title bar; display:none on
+		// every other OS (see .terminal-drag-strip in user.css).
+		var dragStrip = document.createElement("div");
+		dragStrip.className = "terminal-drag-strip";
+		overlay.appendChild(dragStrip);
 
 		var logo = document.createElement("pre");
 		logo.className = "terminal-boot-logo";
@@ -979,7 +1068,7 @@
 			"  --decorative-base: #e6e6e6 !important;",
 			"  --decorative-subdued: #2b2e38 !important;",
 			"}",
-			"* { font-family: 'JetBrains Mono', 'Fira Code', 'Hack', 'DejaVu Sans Mono', monospace !important; }",
+			"* { font-family: " + TERM_FONT_STACK + " !important; }",
 			"body { border: 2px solid #5ebdab; box-sizing: border-box; }",
 			"img.main-image-image, [data-encore-id=\"buttonPrimary\"] { border-radius: 0 !important; }",
 			".x-progressBar-progressFillColor, .x-progressBar-fillColor { background-color: #5ebdab !important; }"
@@ -1012,6 +1101,110 @@
 			var style = win.document.getElementById("terminal-mini-player-style");
 			if (style) style.remove();
 		}
+	}
+
+	// =======================================================================
+	// HiDPI canvas sizing — shared by the visualizer and matrix rain (NOT
+	// the ASCII cover-art canvas, which is deliberately a tiny grid blown
+	// up with image-rendering:pixelated and must stay that way).
+	// A canvas' backing store is in *device* pixels, but everything here
+	// was written (on Linux, devicePixelRatio 1) in CSS pixels. At
+	// Windows' usual 125%/150% scaling that mismatch means a 300px-wide
+	// backing store stretched over 375/450 physical pixels — soft, smeared
+	// bars and glyphs. Fix: size the backing store to cssSize * dpr and
+	// pre-scale the context by dpr, so all drawing code keeps talking CSS
+	// pixels and just comes out sharp. At dpr 1 this is exactly the old
+	// behavior: width/height = the CSS size, identity transform.
+	// Assigning canvas.width/height (even to the same value) clears the
+	// canvas and resets the context state, transform included, so the
+	// transform is reapplied here every time — callers must always resize
+	// through this helper, never by touching canvas.width directly.
+	// setStyle: also pin the CSS size inline, for canvases with no CSS
+	// width/height of their own (matrix rain — a replaced element's
+	// displayed size otherwise follows its backing store, which would make
+	// it dpr times too big). Leave it off when user.css already sizes the
+	// canvas (.terminal-visualizer), so the stylesheet stays in charge.
+	// Stashes the logical size on the element (_cssW/_cssH) — drawing code
+	// reads those, never canvas.width/height. Returns the dpr used.
+	// =======================================================================
+	function currentDpr() {
+		var dpr = window.devicePixelRatio || 1;
+		return dpr > 0 && isFinite(dpr) ? dpr : 1;
+	}
+
+	function sizeCanvasForDpr(canvas, cssW, cssH, setStyle) {
+		var dpr = currentDpr();
+		canvas.width = Math.max(1, Math.round(cssW * dpr));
+		canvas.height = Math.max(1, Math.round(cssH * dpr));
+		if (setStyle) {
+			canvas.style.width = cssW + "px";
+			canvas.style.height = cssH + "px";
+		}
+		canvas._cssW = cssW;
+		canvas._cssH = cssH;
+		canvas._dpr = dpr;
+		var ctx = canvas.getContext("2d");
+		if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+		return dpr;
+	}
+
+	// True when the backing store no longer matches cssW x cssH at the
+	// current dpr (panel resized, or window moved to a monitor with a
+	// different scale factor).
+	function canvasNeedsDprResize(canvas, cssW, cssH) {
+		var dpr = currentDpr();
+		return (
+			canvas._dpr !== dpr ||
+			canvas._cssW !== cssW ||
+			canvas._cssH !== cssH ||
+			canvas.width !== Math.max(1, Math.round(cssW * dpr)) ||
+			canvas.height !== Math.max(1, Math.round(cssH * dpr))
+		);
+	}
+
+	// Calls cb each time devicePixelRatio changes (window dragged to a
+	// monitor with a different scale, or zoom). A resolution media query
+	// only matches one exact value, so after every change the listener is
+	// re-armed against the *new* dpr. Returns a cancel() function.
+	function onDprChange(cb) {
+		var mql = null;
+		var cancelled = false;
+		function handler() {
+			disarm();
+			if (cancelled) return;
+			cb();
+			arm();
+		}
+		function arm() {
+			if (!window.matchMedia) return;
+			mql = window.matchMedia("(resolution: " + currentDpr() + "dppx)");
+			if (mql.addEventListener) mql.addEventListener("change", handler);
+			else if (mql.addListener) mql.addListener(handler);
+		}
+		function disarm() {
+			if (!mql) return;
+			if (mql.removeEventListener) mql.removeEventListener("change", handler);
+			else if (mql.removeListener) mql.removeListener(handler);
+			mql = null;
+		}
+		arm();
+		return function cancel() {
+			cancelled = true;
+			disarm();
+		};
+	}
+
+	// Clears/fills the *entire* backing store regardless of the dpr
+	// transform. Math.round(cssW * dpr) can exceed cssW * dpr by up to half
+	// a device pixel, and a CSS-space rect would leave that edge sliver only
+	// partly covered (e.g. a ghost column in the matrix trail). At dpr 1
+	// this is identical to fillRect/clearRect(0, 0, canvas.width, canvas.height).
+	function paintWholeCanvas(ctx, canvas, clear) {
+		ctx.save();
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		if (clear) ctx.clearRect(0, 0, canvas.width, canvas.height);
+		else ctx.fillRect(0, 0, canvas.width, canvas.height);
+		ctx.restore();
 	}
 
 	// =======================================================================
@@ -1082,17 +1275,25 @@
 			if (canvas && canvas.isConnected && canvas.parentNode === cover.parentNode) {
 				// Resync width if the panel was resized — the canvas'
 				// internal resolution otherwise stays locked to whatever it
-				// was at creation time.
-				var targetW = Math.max(64, cover.clientWidth || 260);
-				if (canvas.width !== targetW) canvas.width = targetW;
+				// was at creation time. Also catches a dpr change (window
+				// moved to a differently-scaled monitor), since this runs
+				// every frame anyway — no separate listener needed here.
+				// Sized from the canvas' own displayed width (user.css gives
+				// it width:100% of the parent, which can be wider than the
+				// cover); sizing from the cover stretched the bars and
+				// cancelled out the dpr-crisp backing store.
+				var targetW = Math.max(64, canvas.clientWidth || cover.clientWidth || 260);
+				if (canvasNeedsDprResize(canvas, targetW, 64)) sizeCanvasForDpr(canvas, targetW, 64, false);
 				return canvas;
 			}
 			if (canvas && canvas.parentNode) canvas.parentNode.removeChild(canvas);
 			canvas = document.createElement("canvas");
 			canvas.className = "terminal-visualizer";
-			canvas.width = Math.max(64, cover.clientWidth || 260);
-			canvas.height = 64;
+			// Displayed size comes from user.css (width:100%; height:64px),
+			// so no inline style — only the backing store is dpr-scaled.
 			cover.parentNode.insertBefore(canvas, cover.nextSibling);
+			// Sized after insertion so clientWidth reflects the real layout.
+			sizeCanvasForDpr(canvas, Math.max(64, canvas.clientWidth || cover.clientWidth || 260), 64, false);
 			return canvas;
 		}
 
@@ -1198,8 +1399,9 @@
 			if (item && item.uri !== currentUri) rebuildBases(item.uri);
 
 			var ctx = canvas.getContext("2d");
-			var w = canvas.width, h = canvas.height;
-			ctx.clearRect(0, 0, w, h);
+			// Logical (CSS-pixel) size — the context is pre-scaled by dpr.
+			var w = canvas._cssW, h = canvas._cssH;
+			paintWholeCanvas(ctx, canvas, true);
 			// No ctx.shadowBlur here (was 4) — a shadow forces the canvas to
 			// re-rasterize a blur kernel on *every single* fillRect call, and
 			// this draws up to 48 of them per frame at 60fps. That's one of
@@ -1349,10 +1551,12 @@
 		// Ctrl+Shift+K, not Ctrl+` — a symbol key's physical position (and
 		// its `code` value) can differ across keyboard layouts (AZERTY vs
 		// QWERTY), which made the original backtick binding unreliable.
-		// Letter keys keep the same `code` (KeyK) regardless of layout, so
-		// this combo is layout-independent.
+		// `code` is the physical key: KeyK types "k" on QWERTY, AZERTY and
+		// QWERTZ alike (not on Dvorak). Alt is excluded because Windows
+		// reports AltGr as Ctrl+Alt, so AltGr+Shift+K on some layouts
+		// would otherwise open the palette while typing a character.
 		document.addEventListener("keydown", function (e) {
-			if (e.ctrlKey && e.shiftKey && e.code === "KeyK") {
+			if (e.ctrlKey && e.shiftKey && !e.altKey && e.code === "KeyK") {
 				if (!settings.palette) return;
 				e.preventDefault();
 				toggleCommandPalette();
@@ -1377,7 +1581,8 @@
 			'<div class="terminal-palette-inputRow">' +
 			'<span class="terminal-palette-prompt">&gt;</span>' +
 			'<input class="terminal-palette-input" spellcheck="false" autocomplete="off" placeholder="type a command, or \'help\'" />' +
-			"</div></div>";
+			"</div></div>" +
+			'<div class="terminal-drag-strip"></div>';
 
 		document.body.appendChild(paletteOverlay);
 
@@ -1693,18 +1898,30 @@
 		matrixState.canvas = canvas;
 		matrixState.ctx = canvas.getContext("2d");
 
+		// #terminal-matrix-rain is position:fixed; inset:0 but has no CSS
+		// width/height, and a canvas is a replaced element — its displayed
+		// size would follow the (dpr-scaled) backing store — so pin the CSS
+		// size inline (setStyle = true). Same size as before at dpr 1.
+		var fontSize = 14;
+		matrixState.fontSize = fontSize;
+		matrixState.drops = [];
+		// Column count follows the width: a wider window (maximize, move to
+		// a bigger monitor) gets new columns on the right instead of an
+		// empty band; a narrower one drops the extras. Existing columns keep
+		// their position so the rain doesn't visibly restart.
 		function resize() {
-			canvas.width = window.innerWidth;
-			canvas.height = window.innerHeight;
+			sizeCanvasForDpr(canvas, window.innerWidth, window.innerHeight, true);
+			var columns = Math.floor(canvas._cssW / fontSize);
+			var drops = matrixState.drops;
+			if (drops.length > columns) drops.length = columns;
+			while (drops.length < columns) drops.push(1);
 		}
 		resize();
 		window.addEventListener("resize", resize);
 		matrixState.resize = resize;
-
-		var fontSize = 14;
-		var columns = Math.floor(canvas.width / fontSize);
-		matrixState.drops = new Array(columns).fill(1);
-		matrixState.fontSize = fontSize;
+		// Resizing wipes the canvas, which the fading trail recovers from
+		// on its own within a few frames, so a dpr change just re-sizes.
+		matrixState.cancelDprWatch = onDprChange(resize);
 
 		requestAnimationFrame(function () {
 			canvas.classList.add("terminal-matrix-visible");
@@ -1720,8 +1937,19 @@
 		var canvas = matrixState.canvas;
 		if (!ctx || !canvas) return;
 		ctx.fillStyle = "rgba(21, 23, 28, 0.15)";
-		ctx.fillRect(0, 0, canvas.width, canvas.height);
-		ctx.font = matrixState.fontSize + "px " + "monospace";
+		paintWholeCanvas(ctx, canvas, false);
+		// Generic "monospace" stays FIRST on purpose: on Linux it's what the
+		// rain has always used (fontconfig → DejaVu Sans Mono), so digits and
+		// symbols render identically there. DejaVu has no katakana, so those
+		// glyphs fall through the list per-glyph; on a stock Linux box none
+		// of the named Japanese faces below exist, so they land on the same
+		// system fallback as before. On Windows "monospace" is Consolas (also
+		// no katakana) and the explicit MS Gothic / Yu Gothic / Meiryo give
+		// the rain a proper fixed-width-ish Japanese face instead of whatever
+		// Chromium's generic fallback picks. (A generic family doesn't have
+		// to be last in a font list; later names are still consulted for
+		// any glyph it lacks.)
+		ctx.font = matrixState.fontSize + "px monospace, 'MS Gothic', 'Yu Gothic', 'Meiryo'";
 		// No ctx.shadowBlur (was 3) — verified live (screenshot, ~35s after
 		// trigger, well past any startup transient) that with ~110+ columns
 		// all drawing a glyph every single frame, a blur radius on every one
@@ -1737,7 +1965,7 @@
 			// reads as the "hot" leading edge of a drop, like real chafa/cmatrix.
 			ctx.fillStyle = Math.random() > 0.94 ? "#d6fff5" : "#5ebdab";
 			ctx.fillText(text, i * matrixState.fontSize, y);
-			if (y > canvas.height && Math.random() > 0.97) {
+			if (y > canvas._cssH && Math.random() > 0.97) {
 				matrixState.drops[i] = 0;
 			}
 			matrixState.drops[i] += settings.matrixRainSpeed || 1;
@@ -1748,6 +1976,8 @@
 	function stopMatrixRain() {
 		if (matrixState.rafId) cancelAnimationFrame(matrixState.rafId);
 		if (matrixState.resize) window.removeEventListener("resize", matrixState.resize);
+		if (matrixState.cancelDprWatch) matrixState.cancelDprWatch();
+		matrixState.cancelDprWatch = null;
 		if (matrixState.canvas && matrixState.canvas.parentNode) {
 			matrixState.canvas.parentNode.removeChild(matrixState.canvas);
 		}
