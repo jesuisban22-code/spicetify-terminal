@@ -5,6 +5,29 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- macOS support on par with Linux and Windows. The theme already tagged
+  `<html>` with `terminal-os-mac`; macOS-only rules now live under that class
+  in `user.css`, so Linux and Windows render exactly as before.
+- Command palette: `Cmd+Shift+K` opens and closes it on macOS. `Ctrl+Shift+K`
+  still works on every OS; the Cmd (Meta) key is only honored on macOS, and
+  Option/AltGr still never triggers it. Spotify's own Mac shortcuts use
+  `Cmd+K` (quick search) but nothing on `Cmd+Shift+K`.
+- README: macOS listed as a supported platform (badge, platform section,
+  install notes with `~/.config/spicetify`, `Cmd+Shift+K`, Menlo fallback),
+  in English and French.
+
+### Fixed
+
+- macOS: the window could not be dragged reliably while the boot sequence or
+  the command palette was open, because both full-screen overlays covered
+  Spotify's draggable top bar (hidden-inset title bar). The overlays' 32px
+  drag strip, already used on Windows, is now enabled on macOS too; the
+  traffic-light buttons stay clickable above it.
+
 ## [1.1.2] - 2026-09-25
 
 ### Fixed

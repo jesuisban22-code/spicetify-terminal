@@ -271,8 +271,8 @@
 		var overlay = document.createElement("div");
 		overlay.id = "terminal-boot-overlay";
 
-		// Window-drag handle for Windows' in-app title bar; display:none on
-		// every other OS (see .terminal-drag-strip in user.css).
+		// Window-drag handle for the in-app title bar on Windows and macOS;
+		// display:none on Linux (see .terminal-drag-strip in user.css).
 		var dragStrip = document.createElement("div");
 		dragStrip.className = "terminal-drag-strip";
 		overlay.appendChild(dragStrip);
@@ -1623,8 +1623,19 @@
 		// QWERTZ alike (not on Dvorak). Alt is excluded because Windows
 		// reports AltGr as Ctrl+Alt, so AltGr+Shift+K on some layouts
 		// would otherwise open the palette while typing a character.
+		//
+		// macOS: Cmd+Shift+K (e.metaKey) is accepted too, since Mac users
+		// reach for Cmd where others use Ctrl; Ctrl+Shift+K keeps working
+		// there as well. Spotify's own Mac bindings use Cmd+K (quick search)
+		// but nothing on Cmd+Shift+K, and macOS has no system-wide binding
+		// for it (Finder's "Go to Network" only applies inside Finder).
+		// Option (altKey) stays excluded, same as AltGr on Windows. Meta is
+		// honored only on macOS: on Linux/Windows it is the Super/Windows
+		// key, which the desktop or OS claims, so behavior there is
+		// unchanged — Ctrl+Shift+K only.
 		document.addEventListener("keydown", function (e) {
-			if (e.ctrlKey && e.shiftKey && !e.altKey && e.code === "KeyK") {
+			var mod = e.ctrlKey || (currentOs === "mac" && e.metaKey);
+			if (mod && e.shiftKey && !e.altKey && e.code === "KeyK") {
 				if (!settings.palette) return;
 				e.preventDefault();
 				toggleCommandPalette();

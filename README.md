@@ -3,7 +3,7 @@
 **A hacker/terminal Spicetify theme for Spotify desktop: a boot sequence, a shell-style command palette, live ASCII-art album covers, and matrix rain.**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-5ebdab)](LICENSE)
-[![Platforms: Linux | Windows](https://img.shields.io/badge/platforms-Linux%20%7C%20Windows-5ebdab)](#works-on-windows--linux)
+[![Platforms: Linux | Windows | macOS](https://img.shields.io/badge/platforms-Linux%20%7C%20Windows%20%7C%20macOS-5ebdab)](#works-on-linux-windows--macos)
 [![Spicetify Marketplace](https://img.shields.io/badge/Spicetify-Marketplace-1ed760)](https://github.com/spicetify/marketplace)
 [![GitHub release](https://img.shields.io/github/v/release/jesuisban22-code/spicetify-terminal)](https://github.com/jesuisban22-code/spicetify-terminal/releases)
 
@@ -17,19 +17,19 @@ Terminal is a [Spicetify](https://spicetify.app) theme for the Spotify desktop a
 
 ![Home view with ASCII covers and the visualizer](screenshots/home.png)
 
-## Works on Windows & Linux
+## Works on Linux, Windows & macOS
 
 - **Linux**: the reference platform. The theme was first built here.
 - **Windows**: supported since v1.1.0. It detects the OS, falls back to Cascadia Mono or Consolas when JetBrains Mono isn't installed, keeps a drag strip so you can still move the window while an overlay is open, stays clear of the minimize/maximize/close buttons, and renders sharply at 125% / 150% / 4K scaling.
-- **macOS**: install with the same bash commands as Linux.
+- **macOS**: supported. Install with the same bash commands as Linux (the config folder is `~/.config/spicetify`). Open the palette with `Cmd+Shift+K` (`Ctrl+Shift+K` works too). The window can still be dragged while the boot screen or the palette is open, nothing important sits under the traffic-light buttons, the font falls back to Menlo when JetBrains Mono isn't installed, and everything stays sharp on Retina displays.
 
-See [CHANGELOG.md](CHANGELOG.md) for the full list of Windows changes.
+See [CHANGELOG.md](CHANGELOG.md) for the full list of platform changes.
 
 ## Features
 
 - **Boot sequence**: a terminal-style boot log when Spotify starts. Click or press any key to skip it.
 - **Live ASCII-art covers**: album art is redrawn as ASCII on home, search, the library, playlist/album headers and the now-playing bar.
-- **Command palette** (`Ctrl+Shift+K`): a small shell for playback, navigation and stats, plus a few easter eggs ([command list](#command-palette)).
+- **Command palette** (`Ctrl+Shift+K`, `Cmd+Shift+K` on macOS): a small shell for playback, navigation and stats, plus a few easter eggs ([command list](#command-palette)).
 - **Audio visualizer** in the Now Playing view. It is driven by the track's real audio analysis (loudness envelope, timbre and pitch), not a generic loop.
 - **Now-playing pulse** that follows the cover's dominant color and the track's real tempo.
 - **Matrix rain screensaver**: it starts when Spotify is paused and you have been idle for a while. The delay (default 2 min) and speed can be changed.
@@ -45,7 +45,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full list of Windows changes.
 
 ### Command palette
 
-Open it with `Ctrl+Shift+K`. The shortcut uses the physical K key, so it works on QWERTY, AZERTY and QWERTZ keyboards, and it doesn't fire on AltGr.
+Open it with `Ctrl+Shift+K`, or `Cmd+Shift+K` on macOS (`Ctrl+Shift+K` works there too). The shortcut uses the physical K key, so it works on QWERTY, AZERTY and QWERTZ keyboards, and it doesn't fire on AltGr / Option. Press it again to close the palette. On Linux and Windows the Super / Windows key is not used, only `Ctrl`.
 
 | Command | What it does |
 |---|---|
@@ -80,7 +80,7 @@ A few easter eggs are hidden in there too: `sudo`, `42`, `coffee`, `hack`, `matr
 
 ### Manual install
 
-**Linux / macOS** (bash, zsh):
+**Linux / macOS** (bash, zsh; the config folder is `~/.config/spicetify` on both):
 
 ```bash
 git clone https://github.com/jesuisban22-code/spicetify-terminal.git "$(spicetify -c | xargs dirname)/Themes/Terminal"
@@ -102,7 +102,7 @@ To update a manual install, run `git pull` in that `Themes/Terminal` folder, the
 
 ### Fonts
 
-The theme uses the first monospace font it finds, in this order: **JetBrains Mono**, Fira Code, Hack, DejaVu Sans Mono, Cascadia Mono, Consolas. For the intended look, install [JetBrains Mono](https://www.jetbrains.com/lp/mono/) on Linux or Windows. Without it, Windows falls back to Cascadia Mono (Windows 11 / Windows Terminal) or Consolas, never Courier New.
+The theme uses the first monospace font it finds, in this order: **JetBrains Mono**, Fira Code, Hack, DejaVu Sans Mono, Cascadia Mono, Consolas, Menlo. For the intended look, install [JetBrains Mono](https://www.jetbrains.com/lp/mono/) on Linux, Windows or macOS (on macOS: `brew install --cask font-jetbrains-mono`, or download it). Without it, Windows falls back to Cascadia Mono (Windows 11 / Windows Terminal) or Consolas, and macOS to Menlo (built in), never Courier New.
 
 ## Requirements
 
@@ -151,11 +151,11 @@ Found a bug or have an idea? [Open an issue](https://github.com/jesuisban22-code
 
 Terminal est un thème [Spicetify](https://spicetify.app) pour l'application Spotify desktop, avec une esthétique hacker/terminal : fond sombre, police monospace partout, pochettes d'album converties en art ASCII en direct, pluie matrix en économiseur d'écran, et une vraie palette de commandes façon shell.
 
-### Fonctionne sous Windows et Linux
+### Fonctionne sous Linux, Windows et macOS
 
 - **Linux** : plateforme de référence, là où le thème a été conçu.
 - **Windows** : pris en charge depuis la v1.1.0. Le thème détecte l'OS, se rabat sur Cascadia Mono ou Consolas si JetBrains Mono est absente, garde une bande de déplacement de la fenêtre pendant les overlays, ne cache pas les boutons réduire/agrandir/fermer, et reste net à 125 % / 150 % / 4K.
-- **macOS** : mêmes commandes bash que sous Linux.
+- **macOS** : pris en charge. Mêmes commandes bash que sous Linux (dossier de config `~/.config/spicetify`). La palette s'ouvre avec `Cmd+Shift+K` (`Ctrl+Shift+K` marche aussi). La fenêtre reste déplaçable pendant l'écran de démarrage et la palette, rien d'important n'est caché sous les boutons « feux tricolores », la police se rabat sur Menlo si JetBrains Mono est absente, et tout reste net sur écran Retina.
 
 Détails dans le [CHANGELOG](CHANGELOG.md).
 
@@ -163,7 +163,7 @@ Détails dans le [CHANGELOG](CHANGELOG.md).
 
 - **Séquence de démarrage** façon boot terminal au lancement de Spotify (clic ou touche pour passer)
 - **Art de couverture ASCII** en direct sur les pochettes (accueil, recherche, bibliothèque, en-têtes de playlist/album, barre de lecture)
-- **Palette de commandes** (`Ctrl+Shift+K`) : un vrai mini-shell (voir le tableau ci-dessous)
+- **Palette de commandes** (`Ctrl+Shift+K`, `Cmd+Shift+K` sur macOS) : un vrai mini-shell (voir le tableau ci-dessous)
 - **Visualiseur audio** dans la vue « En cours de lecture », piloté par les vraies données d'analyse audio du morceau (enveloppe de volume réelle, timbre et hauteur des notes), pas une animation générique
 - **Pulsation « now playing »** synchronisée à la couleur dominante de la pochette et au tempo réel du morceau
 - **Pluie matrix** en économiseur d'écran, quand la lecture est en pause et après un délai d'inactivité (2 min par défaut, délai et vitesse réglables)
@@ -175,7 +175,7 @@ Détails dans le [CHANGELOG](CHANGELOG.md).
 
 #### Palette de commandes
 
-`Ctrl+Shift+K` (touche K physique : fonctionne en AZERTY, QWERTY et QWERTZ, pas déclenchée par AltGr).
+`Ctrl+Shift+K`, ou `Cmd+Shift+K` sur macOS (où `Ctrl+Shift+K` marche aussi). Touche K physique : fonctionne en AZERTY, QWERTY et QWERTZ, pas déclenchée par AltGr / Option. Même raccourci pour refermer. Sous Linux et Windows, la touche Super / Windows n'est pas utilisée, seulement `Ctrl`.
 
 | Commande | Effet |
 |---|---|
@@ -204,11 +204,11 @@ Et quelques easter eggs : `sudo`, `42`, `coffee`, `hack`, `matrix`… `egg` les 
 
 #### Manuellement
 
-Mêmes commandes que ci-dessus : bloc **bash** pour Linux / macOS, bloc **PowerShell** pour Windows (voir [Manual install](#manual-install)). Sur Windows, le dossier cible est en général `%APPDATA%\spicetify\Themes\Terminal`. Pour mettre à jour : `git pull` dans ce dossier, puis `spicetify apply`.
+Mêmes commandes que ci-dessus : bloc **bash** pour Linux / macOS (dossier de config `~/.config/spicetify` sur les deux), bloc **PowerShell** pour Windows (voir [Manual install](#manual-install)). Sur Windows, le dossier cible est en général `%APPDATA%\spicetify\Themes\Terminal`. Pour mettre à jour : `git pull` dans ce dossier, puis `spicetify apply`.
 
 #### Polices
 
-Le thème utilise la première police monospace disponible dans cet ordre : **JetBrains Mono**, Fira Code, Hack, DejaVu Sans Mono, Cascadia Mono, Consolas. Pour le rendu de référence, installe [JetBrains Mono](https://www.jetbrains.com/lp/mono/) sur Linux comme sur Windows. Sans elle, Windows utilise Cascadia Mono (Windows 11 / Windows Terminal) ou Consolas, jamais Courier New.
+Le thème utilise la première police monospace disponible dans cet ordre : **JetBrains Mono**, Fira Code, Hack, DejaVu Sans Mono, Cascadia Mono, Consolas, Menlo. Pour le rendu de référence, installe [JetBrains Mono](https://www.jetbrains.com/lp/mono/) sur Linux, Windows ou macOS (sur macOS : `brew install --cask font-jetbrains-mono`, ou téléchargement direct). Sans elle, Windows utilise Cascadia Mono (Windows 11 / Windows Terminal) ou Consolas, et macOS Menlo (intégrée), jamais Courier New.
 
 ### Prérequis
 
