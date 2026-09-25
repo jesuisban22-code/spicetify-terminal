@@ -2770,8 +2770,14 @@
 			return targets;
 		}
 
+		// ~30 fps is plenty for bars driven by 1/10 s analysis segments and
+		// halves the per-frame DOM query + canvas work on weaker machines.
+		var lastVisFrame = 0;
 		function draw() {
 			rafId = requestAnimationFrame(draw);
+			var nowT = performance.now();
+			if (nowT - lastVisFrame < 32) return;
+			lastVisFrame = nowT;
 			if (document.hidden || REDUCED_MOTION || !settings.visualizer) {
 				var stale = document.querySelector(".terminal-visualizer");
 				if (stale && !settings.visualizer) stale.parentNode.removeChild(stale);

@@ -5053,4 +5053,86 @@ html.terminal-full .encore-dark-theme .encore-inverted-light-set {
   --essential-base: var(--term-green) !important;
   --essential-subdued: var(--term-subdued) !important;
 }
+
+/* Fixes from the third real-client screenshot. */
+
+/* "sep: •" rows: the separator pieces were hidden by a rule that lost on
+   specificity to the one laying the tagged pieces out. */
+html.terminal-full .Root__main-view .main-entityHeader-metaData[data-tf-meta] [data-tf-key="sep"],
+html.terminal-full .Root__main-view .main-entityHeader-metaData[data-tf-meta] > * > [data-tf-key="sep"] {
+  display: none !important;
+}
+
+/* "Plavlist": descenders of the small line above the title were clipped. */
+html.terminal-full .Root__main-view :is(.main-entityHeader-headerText, .main-entityHeader-headerTextSection) > :first-child,
+html.terminal-full .Root__main-view :is(.main-entityHeader-headerText, .main-entityHeader-headerTextSection) > :first-child * {
+  line-height: 1.5 !important;
+  overflow: visible !important;
+  padding-bottom: 1px;
+}
+
+/* Transport glyphs (↻ sat low in the active repeat key): the glyph is laid
+   over the whole button and centred, whatever Spotify keeps inside it. */
+html.terminal-full :is(
+  [data-testid="control-button-shuffle"],
+  [data-testid="control-button-skip-back"],
+  [data-testid="control-button-skip-forward"],
+  [data-testid="control-button-repeat"]
+) {
+  position: relative !important;
+}
+html.terminal-full :is(
+  [data-testid="control-button-shuffle"],
+  [data-testid="control-button-skip-back"],
+  [data-testid="control-button-skip-forward"],
+  [data-testid="control-button-repeat"]
+) > * {
+  visibility: hidden !important;
+}
+html.terminal-full :is(
+  [data-testid="control-button-shuffle"],
+  [data-testid="control-button-skip-back"],
+  [data-testid="control-button-skip-forward"],
+  [data-testid="control-button-repeat"]
+)::before {
+  position: absolute !important;
+  inset: 0;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  line-height: 1 !important;
+}
+
+/* Cover was flush against the window edge. */
+html.terminal-full .Root__now-playing-bar [data-testid="now-playing-widget"] {
+  margin-left: 12px !important;
+}
+
+/* Empty frame before the bell: the news / friends wrappers were framed
+   as keys around Spotify's own framed button. Only the buttons keep one. */
+html.terminal-full .Root__globalNav :is(.main-topBar-whatsNewFeed, .main-topBar-buddyFeed, .main-globalNav-buddyFeed):not(button) {
+  border-color: transparent !important;
+  background: transparent !important;
+  padding: 0 !important;
+  min-width: 0 !important;
+}
+
+/* Perpetual opacity "breathing" on the status line and cover frame: kept
+   the compositor busy for a 1px line; the tint stays, static. */
+html.terminal-full .Root__now-playing-bar::before,
+html.terminal-full .main-nowPlayingWidget-coverArt::after {
+  animation: none !important;
+  opacity: 0.8;
+}
+
+/* CRT scanlines in full mode: a full-window layer above everything makes
+   the GPU re-blend the whole window on every visible change (scrolling,
+   progress bar, hover), which integrated GPUs feel as input latency. The
+   terminal look carries itself without it in this mode; the setting still
+   works in the classic mode. */
+html.terminal-full.terminal-crt-enabled::after,
+html.terminal-full.terminal-crt-enabled::before {
+  content: none !important;
+  display: none !important;
+}
 /* --- END FULL/CHROME ----------------------------------------------------- */
