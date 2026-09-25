@@ -1213,6 +1213,483 @@
 	// --- END FULL/PAGES ----------------------------------------------------
 
 	// --- FULL/CHROME: overlays, branding, page tags (agent D) -------------
+	//
+	// Four independent parts, each registered on its own so one failing
+	// can't take the others down (applyFullConversionSetting wraps every
+	// part in its own try/catch):
+	//   1. page tag   — html[data-tf-page] from Platform.History
+	//   2. window title — "terminal" / "♪ Title — Artist · terminal"
+	//   3. UI strings — "Spotify" → "terminal" in Spicetify.Locale
+	//   4. idle title — Spicetify.AppTitle override
+	// plus two things that are NOT parts because they must work in BOTH
+	// modes (they're how you get back from either one): the palette's
+	// `mode` command and the Ctrl+Shift+Alt+N escape hatch.
+	//
+	// Every setup below is idempotent (safe to call again while already
+	// on), since applyFullConversionSetting runs every part's setup each
+	// time it's called with the mode on.
+	// ---------------------------------------------------------------------
+
+	// ---- 1. Page tag ------------------------------------------------------
+	// Sets data-tf-page on <html> so the full-conversion CSS can target a
+	// page type without relying on per-page hashed classes. Values (the
+	// ONLY values ever written — keep user.css selectors to this list):
+	//   home        /
+	//   search      /search, /search/<q>/..., /genre/... (browse)
+	//   playlist    /playlist/<id>
+	//   album       /album/<id>
+	//   artist      /artist/<id> (and /artist/<id>/discography etc.)
+	//   show        /show/<id> (podcast)
+	//   episode     /episode/<id>
+	//   collection  /collection/... (liked songs, your episodes, library)
+	//   lyrics      /lyrics
+	//   queue       /queue
+	//   settings    /preferences (Spotify's settings route), /settings
+	//   profile     /user/<id>
+	//   other       anything else (custom apps, /history, /concert...)
+	// The attribute is removed on teardown, so no rule keyed on it can
+	// leak into native mode even if it forgot the html.terminal-full scope.
+	var TF_PAGE_RULES = [
+		[/^\/?$/, "home"],
+		[/^\/(search|genre)(\/|$)/, "search"],
+		[/^\/playlist\//, "playlist"],
+		[/^\/album\//, "album"],
+		[/^\/artist\//, "artist"],
+		[/^\/show\//, "show"],
+		[/^\/episode\//, "episode"],
+		[/^\/collection(\/|$)/, "collection"],
+		[/^\/lyrics(\/|$)/, "lyrics"],
+		[/^\/queue(\/|$)/, "queue"],
+		[/^\/(preferences|settings)(\/|$)/, "settings"],
+		[/^\/user\//, "profile"]
+	];
+
+	function tfPageFromPath(path) {
+		path = String(path || "/");
+		for (var i = 0; i < TF_PAGE_RULES.length; i++) {
+			if (TF_PAGE_RULES[i][0].test(path)) return TF_PAGE_RULES[i][1];
+		}
+		return "other";
+	}
+
+	function tfHistoryReady() {
+		return Spicetify.Platform && Spicetify.Platform.History && Spicetify.Platform.History.listen;
+	}
+
+	var tfPageTag = { active: false, unlisten: null, listening: false };
+
+	// History.listen hands over the location in the v4 shape (location,
+	// action) on current builds — which is what setupPageTransitions relies
+	// on — but history v5 passes ({ location, action }). Accept both, and
+	// fall back to History.location for anything else.
+	function tfApplyPageTag(arg) {
+		if (!tfPageTag.active) return;
+		var loc = arg && arg.location && typeof arg.location.pathname === "string" ? arg.location : arg;
+		var path = loc && typeof loc.pathname === "string" ? loc.pathname : null;
+		if (path === null) {
+			try {
+				path = Spicetify.Platform.History.location.pathname;
+			} catch (e) {
+				path = "/";
+			}
+		}
+		document.documentElement.setAttribute("data-tf-page", tfPageFromPath(path));
+	}
+
+	fullConversionParts.push({
+		setup: function () {
+			tfPageTag.active = true;
+			waitFor(tfHistoryReady, function () {
+				if (!tfPageTag.active) return;
+				var H = Spicetify.Platform.History;
+				tfApplyPageTag(H.location);
+				// Subscribe once. If listen() returned an unsubscribe function we
+				// drop it on teardown and re-subscribe on the next setup; if it
+				// didn't (older builds), the one listener stays but goes inert via
+				// tfPageTag.active, and is never stacked a second time.
+				if (!tfPageTag.listening) {
+					var un = H.listen(tfApplyPageTag);
+					tfPageTag.listening = true;
+					tfPageTag.unlisten = typeof un === "function" ? un : null;
+				}
+			});
+		},
+		teardown: function () {
+			tfPageTag.active = false;
+			if (tfPageTag.unlisten) {
+				try {
+					tfPageTag.unlisten();
+				} catch (e) {
+					/* router already gone — nothing to unsubscribe from */
+				}
+				tfPageTag.unlisten = null;
+				tfPageTag.listening = false;
+			}
+			document.documentElement.removeAttribute("data-tf-page");
+		}
+	});
+
+	// ---- 2. Window title --------------------------------------------------
+	// document.title is what the OS shows in the title bar, taskbar and
+	// alt-tab on Windows and Linux. Spotify rewrites it on every track
+	// change and on every idle/playing switch, so a one-shot write isn't
+	// enough: a MutationObserver on <title> re-applies our version after
+	// each of Spotify's writes.
+	//
+	// Formats Spotify has used (and what they become):
+	//   "Spotify", "Spotify Premium", "Spotify Free"   → "terminal"
+	//   "Title • Artist"  (current desktop/xpui)       → "♪ Title — Artist · terminal"
+	//   "Artist - Title"  (legacy desktop)             → "♪ Title — Artist · terminal"
+	//   "... - Spotify" / "Spotify – ..." (web-style)  → brand stripped first
+	// The order ambiguity (title first or artist first) is settled with
+	// the real current track from Spicetify.Player.data when it matches
+	// the string; the separator-based guess is only the fallback.
+	//
+	// Loop safety: every string we write ends in TF_TITLE_TAIL (or is
+	// exactly "terminal"), is recorded in tfTitle.written, and the observer
+	// ignores both — so our own write never triggers a second rewrite.
+	var TF_TITLE_TAIL = " · terminal";
+	var TF_BRAND_ONLY = /^\s*Spotify(?:\s+(?:Premium|Free|Family|Duo|Student))?\s*$/i;
+	var TF_BRAND_SUFFIX = /\s+[-–—|•·:]\s+Spotify(?:\s+(?:Premium|Free))?\s*$/i;
+	var TF_BRAND_PREFIX = /^\s*Spotify(?:\s+(?:Premium|Free))?\s+[-–—|•·:]\s+/i;
+
+	function tfCurrentTrack() {
+		try {
+			var item = Spicetify.Player && Spicetify.Player.data && Spicetify.Player.data.item;
+			if (!item) return null;
+			var name = item.name || (item.metadata && item.metadata.title) || "";
+			var artists = (item.artists || [])
+				.map(function (a) { return a && a.name; })
+				.filter(Boolean);
+			if (!artists.length && item.metadata && item.metadata.artist_name) artists = [item.metadata.artist_name];
+			return name ? { name: name, artists: artists } : null;
+		} catch (e) {
+			return null;
+		}
+	}
+
+	function tfTrackTitle(name, artist) {
+		return "♪ " + name + (artist ? " — " + artist : "") + TF_TITLE_TAIL;
+	}
+
+	// Pure function: raw Spotify title in, terminal title out. Returns
+	// the input unchanged when there's nothing to rebrand.
+	function tfRewriteTitle(raw) {
+		if (typeof raw !== "string" || !raw) return raw;
+		if (raw === "terminal" || raw.slice(-TF_TITLE_TAIL.length) === TF_TITLE_TAIL) return raw;
+		if (TF_BRAND_ONLY.test(raw)) return "terminal";
+		var s = raw.replace(TF_BRAND_SUFFIX, "").replace(TF_BRAND_PREFIX, "").trim();
+		var branded = s !== raw.trim();
+
+		var t = tfCurrentTrack();
+		if (t && s.indexOf(t.name) !== -1) {
+			var matched = t.artists.filter(function (a) { return s.indexOf(a) !== -1; });
+			if (matched.length) return tfTrackTitle(t.name, t.artists.join(", "));
+		}
+		// xpui order: "Title • Artist". A title may itself contain " - "
+		// ("Song - Remastered 2011 • Artist"), so the bullet wins.
+		var m = /^(.+?)\s+[•·]\s+(.+)$/.exec(s);
+		if (m) return tfTrackTitle(m[1], m[2]);
+		// Legacy order: "Artist - Title".
+		m = /^(.+?)\s+[-–—]\s+(.+)$/.exec(s);
+		if (m) return tfTrackTitle(m[2], m[1]);
+		if (/\bSpotify\b/.test(s)) return s.replace(/\bSpotify\b/g, "terminal");
+		if (branded) return s ? s + TF_TITLE_TAIL : "terminal";
+		return raw;
+	}
+
+	var tfTitle = { active: false, obs: null, headObs: null, el: null, timer: null, written: null, original: null };
+
+	function tfTitleRun() {
+		tfTitle.timer = null;
+		if (!tfTitle.active) return;
+		var cur = document.title;
+		if (cur === tfTitle.written) return;
+		var next = tfRewriteTitle(cur);
+		tfTitle.original = cur;
+		if (next === cur) return;
+		tfTitle.written = next;
+		document.title = next;
+	}
+
+	// Debounced: Spotify sometimes writes the title twice in a row on a
+	// track change; one rewrite 30ms later covers both.
+	function tfTitleSchedule() {
+		if (tfTitle.timer) clearTimeout(tfTitle.timer);
+		tfTitle.timer = setTimeout(tfTitleRun, 30);
+	}
+
+	// Observes only the <title> element itself (its text), plus <head>'s
+	// direct children (childList, no subtree) in case the element gets
+	// replaced — never the whole document.
+	function tfTitleBind() {
+		var el = document.querySelector("head > title") || document.querySelector("title");
+		if (el === tfTitle.el) return;
+		if (tfTitle.obs) tfTitle.obs.disconnect();
+		tfTitle.el = el;
+		if (!el) return;
+		tfTitle.obs = new MutationObserver(tfTitleSchedule);
+		tfTitle.obs.observe(el, { childList: true, characterData: true, subtree: true });
+	}
+
+	fullConversionParts.push({
+		setup: function () {
+			if (tfTitle.active) return;
+			tfTitle.active = true;
+			tfTitleBind();
+			if (document.head && !tfTitle.headObs) {
+				tfTitle.headObs = new MutationObserver(function () {
+					tfTitleBind();
+					tfTitleSchedule();
+				});
+				tfTitle.headObs.observe(document.head, { childList: true });
+			}
+			tfTitleSchedule();
+		},
+		teardown: function () {
+			tfTitle.active = false;
+			if (tfTitle.timer) clearTimeout(tfTitle.timer);
+			tfTitle.timer = null;
+			if (tfTitle.obs) tfTitle.obs.disconnect();
+			if (tfTitle.headObs) tfTitle.headObs.disconnect();
+			tfTitle.obs = tfTitle.headObs = tfTitle.el = null;
+			// Put Spotify's own last title back, but only if ours is still
+			// showing — if Spotify wrote a newer one meanwhile, keep that.
+			if (tfTitle.written !== null && document.title === tfTitle.written && tfTitle.original) {
+				document.title = tfTitle.original;
+			}
+			tfTitle.written = null;
+		}
+	});
+
+	// ---- 3. UI strings (Spicetify.Locale) ---------------------------------
+	// Spicetify.Locale._dictionary is Spotify's live i18n map (key → string,
+	// or key → { one, other } for plurals). Rewriting a value renames that
+	// string everywhere it's rendered from then on ("About Spotify" →
+	// "About terminal", "Spotify Connect" → "terminal Connect"...).
+	// Strings already on screen keep their text until React re-renders
+	// them (usually the next navigation), which is fine for a rename.
+	//
+	// Safety, since these strings are templates, not plain text:
+	//   - only text at brace depth 0 is touched, so "{0}", "{name}" and
+	//     ICU blocks like "{count, plural, one {…} other {…}}" keep their
+	//     exact shape (a "Spotify" inside a plural branch is left as is);
+	//   - case-sensitive "Spotify" as a whole word only, and never when a
+	//     domain follows ("Spotify.com", "spotify.com/premium") so link
+	//     text and URLs stay intact;
+	//   - only string values change type-for-type; a frozen dictionary or a
+	//     key that refuses the write is skipped, not forced;
+	//   - every original value is kept and written back on teardown.
+	var TF_BRAND_WORD = /\bSpotify\b(?!\.[A-Za-z])/g;
+
+	function tfRebrandTemplate(str) {
+		if (typeof str !== "string" || str.indexOf("Spotify") === -1) return str;
+		var out = "";
+		var depth = 0;
+		var chunk = "";
+		for (var i = 0; i < str.length; i++) {
+			var c = str.charAt(i);
+			if (c === "{" || c === "}") {
+				out += depth === 0 ? chunk.replace(TF_BRAND_WORD, "terminal") : chunk;
+				chunk = "";
+				depth = Math.max(0, depth + (c === "{" ? 1 : -1));
+				out += c;
+			} else {
+				chunk += c;
+			}
+		}
+		out += depth === 0 ? chunk.replace(TF_BRAND_WORD, "terminal") : chunk;
+		return out;
+	}
+
+	var tfLocale = { active: false, backup: null, dict: null };
+
+	function tfRebrandLocale() {
+		if (!tfLocale.active || tfLocale.backup) return;
+		var L = Spicetify.Locale;
+		var dict = L && L._dictionary;
+		if (!dict || typeof dict !== "object" || Object.isFrozen(dict)) return;
+		var backup = {};
+		for (var key in dict) {
+			if (!Object.prototype.hasOwnProperty.call(dict, key)) continue;
+			var v = dict[key];
+			var nv = v;
+			if (typeof v === "string") {
+				nv = tfRebrandTemplate(v);
+			} else if (v && typeof v === "object") {
+				var copy = null;
+				for (var form in v) {
+					if (!Object.prototype.hasOwnProperty.call(v, form) || typeof v[form] !== "string") continue;
+					var f = tfRebrandTemplate(v[form]);
+					if (f !== v[form]) {
+						copy = copy || assign({}, v);
+						copy[form] = f;
+					}
+				}
+				if (copy) nv = copy;
+			}
+			if (nv === v) continue;
+			try {
+				dict[key] = nv;
+				backup[key] = v;
+			} catch (e) {
+				/* read-only key — leave it */
+			}
+		}
+		tfLocale.backup = backup;
+		tfLocale.dict = dict;
+	}
+
+	fullConversionParts.push({
+		setup: function () {
+			tfLocale.active = true;
+			waitFor(
+				function () { return Spicetify.Locale && Spicetify.Locale._dictionary; },
+				tfRebrandLocale
+			);
+		},
+		teardown: function () {
+			tfLocale.active = false;
+			var dict = tfLocale.dict;
+			var backup = tfLocale.backup;
+			tfLocale.backup = tfLocale.dict = null;
+			if (!dict || !backup) return;
+			for (var key in backup) {
+				if (!Object.prototype.hasOwnProperty.call(backup, key)) continue;
+				try {
+					dict[key] = backup[key];
+				} catch (e) {
+					/* same key refused the first write too — nothing to undo */
+				}
+			}
+		}
+	});
+
+	// ---- 4. Idle window title (Spicetify.AppTitle) ------------------------
+	// When nothing plays, Spotify's title comes from ProductState "name"
+	// ("Spotify Premium"/"Spotify Free"). AppTitle.set overrides it and
+	// keeps re-asserting the override; reset() hands it back. Resolves
+	// only after UserAPI is up, hence the waitFor. The <title> observer in
+	// part 2 already covers this visually — this just stops Spotify from
+	// producing the branded string in the first place, so the taskbar
+	// doesn't flash "Spotify Premium" for 30ms on every pause.
+	var tfAppTitle = { active: false, applied: false };
+
+	fullConversionParts.push({
+		setup: function () {
+			tfAppTitle.active = true;
+			waitFor(
+				function () { return Spicetify.AppTitle && typeof Spicetify.AppTitle.set === "function"; },
+				function () {
+					if (!tfAppTitle.active || tfAppTitle.applied) return;
+					tfAppTitle.applied = true;
+					try {
+						var p = Spicetify.AppTitle.set("terminal");
+						if (p && typeof p.catch === "function") p.catch(function () { tfAppTitle.applied = false; });
+					} catch (e) {
+						tfAppTitle.applied = false;
+					}
+				}
+			);
+		},
+		teardown: function () {
+			tfAppTitle.active = false;
+			if (!tfAppTitle.applied) return;
+			tfAppTitle.applied = false;
+			try {
+				var p = Spicetify.AppTitle.reset();
+				if (p && typeof p.catch === "function") p.catch(function () {});
+			} catch (e) {
+				/* AppTitle gone — Spotify restores its own title on next launch */
+			}
+		}
+	});
+
+	// ---- Mode switch (both modes) ------------------------------------------
+	// One function behind the palette command, the keyboard shortcut and
+	// (indirectly, through the same setting) the settings-panel row.
+	function tfSetFullMode(on) {
+		settings.fullConversion = !!on;
+		saveSettings();
+		applyFullConversionSetting();
+		// Keep an open settings panel honest: its first-registry-order row
+		// is the fullConversion checkbox (rows are built from
+		// FEATURE_REGISTRY in order).
+		var idx = -1;
+		for (var i = 0; i < FEATURE_REGISTRY.length; i++) {
+			if (FEATURE_REGISTRY[i].key === "fullConversion") idx = i;
+		}
+		var rows = document.querySelectorAll(".terminal-settings > .terminal-settings-row");
+		var cb = idx >= 0 && rows[idx] && rows[idx].querySelector("input[type=\"checkbox\"]");
+		if (cb) cb.checked = !!on;
+		return tfModeLabel();
+	}
+
+	function tfModeLabel() {
+		return settings.fullConversion
+			? "mode terminal complet : activé"
+			: "mode natif (thème classique) : activé";
+	}
+
+	function tfShortcutLabel() {
+		return currentOs === "mac" ? "cmd+maj+alt+n" : "ctrl+maj+alt+n";
+	}
+
+	function tfNotify(msg) {
+		try {
+			if (typeof Spicetify.showNotification === "function") Spicetify.showNotification(msg);
+		} catch (e) {
+			/* no toast API yet — the mode switch itself already happened */
+		}
+	}
+
+	// Escape hatch: Ctrl+Shift+Alt+N (Cmd+Shift+Alt+N or Ctrl+… on macOS)
+	// flips the mode from anywhere, including when full mode has made
+	// something hard to reach. Clash check:
+	//   - Spotify binds Ctrl+N (new playlist) and Ctrl+Shift+N (new
+	//     folder); its Mousetrap matches modifiers exactly, so the extra
+	//     Alt keeps this combo distinct from both.
+	//   - No Windows, GNOME/KDE/Xfce or macOS system default uses it.
+	//   - Windows reports AltGr as Ctrl+Alt, and AltGr+Shift+N types a
+	//     letter on some layouts (Polish "Ń"): AltGraph state and any
+	//     text field are both ignored, so typing is never hijacked.
+	// Registered once, outside the setup/teardown parts, because it has to
+	// work in native mode too — that's how you come back.
+	document.addEventListener("keydown", function (e) {
+		if (e.code !== "KeyN" || !e.shiftKey || !e.altKey || e.repeat) return;
+		var mod = currentOs === "mac" ? e.metaKey || e.ctrlKey : e.ctrlKey && !e.metaKey;
+		if (!mod) return;
+		if (e.getModifierState && e.getModifierState("AltGraph")) return;
+		if (isTypingContext()) return;
+		e.preventDefault();
+		tfNotify(tfSetFullMode(!settings.fullConversion) + " (" + tfShortcutLabel() + " pour basculer)");
+	});
+
+	// Palette: `mode full` / `mode native` / `mode toggle` / `mode`.
+	// COMMANDS is a `var` assigned further down this file, so it's still
+	// undefined while this section runs; waitFor's first retry (200ms)
+	// finds it. Adds a key and wraps `help` rather than editing the
+	// COMMANDS literal, so the palette section stays untouched.
+	waitFor(
+		function () { return typeof COMMANDS === "object" && COMMANDS && typeof COMMANDS.help === "function"; },
+		function () {
+			if (COMMANDS.mode) return;
+			COMMANDS.mode = function (arg) {
+				var a = String(arg || "").trim().toLowerCase();
+				var usage = "usage: mode <full|native|toggle>  (raccourci " + tfShortcutLabel() + ")";
+				if (!a || a === "status") return tfModeLabel() + "\n" + usage;
+				if (/^(full|complet|terminal|on)$/.test(a)) return tfSetFullMode(true);
+				if (/^(native|natif|classic|classique|off)$/.test(a)) return tfSetFullMode(false);
+				if (a === "toggle") return tfSetFullMode(!settings.fullConversion);
+				return usage;
+			};
+			var baseHelp = COMMANDS.help;
+			COMMANDS.help = function () {
+				return baseHelp.apply(this, arguments) + " · mode <full|native>";
+			};
+		}
+	);
+
 	// --- END FULL/CHROME ---------------------------------------------------
 
 	// =======================================================================

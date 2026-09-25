@@ -1024,4 +1024,585 @@ html.terminal-full {
 /* --- END FULL/PAGES ------------------------------------------------------ */
 
 /* --- FULL/CHROME (agent D) ----------------------------------------------- */
+/* Overlays (context menus, tooltips, dialogs, toasts, the settings window)
+   drawn as terminal windows, plus Spotify branding removal. theme.js also
+   sets html[data-tf-page] = home | search | playlist | album | artist |
+   show | episode | collection | lyrics | queue | settings | profile | other
+   (see the FULL/CHROME section there) for page-specific rules. */
+
+/* ---- Context menus: a dropdown window with a title strip ---------------- */
+html.terminal-full .main-contextMenu-menu {
+  border-radius: 0 !important;
+  border: 1px solid var(--term-green) !important;
+  background: var(--term-bg-elevated) !important;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45) !important;
+  padding: 0 0 4px !important;
+  font-family: var(--term-font) !important;
+  font-size: 12.5px;
+  transform-origin: top left;
+  animation: tf-menu-in var(--tf-med) var(--tf-ease) both;
+}
+
+@keyframes tf-menu-in {
+  from { opacity: 0; transform: translateY(-4px) scaleY(0.96); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Title strip "┌─ menu ───…". Sticky so it stays put while a long menu
+   (add to playlist) scrolls under it; the long run of ─ is clipped by
+   overflow, so it always reaches the right edge whatever the width. */
+html.terminal-full .main-contextMenu-menu::before {
+  content: "┌─ menu ──────────────────────────────────────────────────────────────────────────";
+  display: block;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: var(--tf-title-h);
+  line-height: var(--tf-title-h);
+  padding: 0 8px;
+  margin-bottom: 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  background: var(--term-bg-elevated-hi);
+  border-bottom: 1px solid var(--term-border);
+  color: var(--term-subdued);
+  font-size: 11px;
+}
+
+html.terminal-full .main-contextMenu-menuItemButton {
+  border-radius: 0 !important;
+  min-height: 32px;
+  padding-left: 24px !important;
+  font-family: var(--term-font) !important;
+}
+
+html.terminal-full .main-contextMenu-menuItemLabel,
+html.terminal-full .main-contextMenu-menuHeading {
+  font-family: var(--term-font) !important;
+  font-weight: 400 !important;
+  letter-spacing: 0 !important;
+}
+
+html.terminal-full .main-contextMenu-menuHeading {
+  color: var(--term-subdued) !important;
+  font-size: 11px !important;
+  text-transform: lowercase;
+}
+
+html.terminal-full .main-contextMenu-menuHeading::before {
+  content: "# ";
+  color: var(--term-green-dim);
+}
+
+/* The › prompt is always there (dim), and lights up on the active row —
+   hover or keyboard focus alike, so arrow-key navigation reads the same. */
+html.terminal-full .main-contextMenu-menuItemButton::before {
+  left: 9px;
+  opacity: 0.35;
+  color: var(--term-subdued);
+  transition: opacity var(--tf-fast) var(--tf-ease), color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .main-contextMenu-menuItemButton:is(:hover, :focus, :focus-visible)::before,
+html.terminal-full .main-contextMenu-menuItemButton[aria-expanded="true"]::before {
+  opacity: 1;
+  color: var(--term-green);
+}
+
+html.terminal-full .main-contextMenu-menuItemButton:is(:hover, :focus, :focus-visible),
+html.terminal-full .main-contextMenu-menuItemButton[aria-expanded="true"] {
+  background-color: rgba(94, 189, 171, 0.16) !important;
+  color: var(--term-text) !important;
+  outline: none;
+  box-shadow: inset 2px 0 0 var(--term-green);
+}
+
+html.terminal-full .main-contextMenu-menuItemButton[aria-disabled="true"],
+html.terminal-full .main-contextMenu-menuItemButtonDisabled {
+  opacity: 0.45;
+}
+
+/* Submenus: the chevron svg becomes a ▸ glyph. */
+html.terminal-full .main-contextMenu-subMenuIcon {
+  display: none !important;
+}
+
+html.terminal-full .main-contextMenu-menuItemButton:has(.main-contextMenu-subMenuIcon)::after {
+  content: "▸";
+  margin-left: auto;
+  padding-left: 12px;
+  color: var(--term-subdued);
+}
+
+html.terminal-full .main-contextMenu-menuItemButton[aria-expanded="true"]:has(.main-contextMenu-subMenuIcon)::after {
+  color: var(--term-green);
+}
+
+/* Dividers as a box-drawing rule "├────…". Spotify draws them with a
+   pseudo-element or a border depending on the build, so both are reset
+   and the line is drawn in-flow (never absolutely over an item). */
+html.terminal-full .main-contextMenu-dividerAfter,
+html.terminal-full .main-contextMenu-dividerBefore {
+  border: 0 !important;
+}
+
+html.terminal-full .main-contextMenu-dividerAfter::after,
+html.terminal-full .main-contextMenu-dividerBefore::before {
+  content: "├──────────────────────────────────────────────────────────────────────────────" !important;
+  display: block !important;
+  position: static !important;
+  height: 12px !important;
+  line-height: 12px !important;
+  margin: 2px 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: none !important;
+  overflow: hidden;
+  white-space: nowrap;
+  font-family: var(--term-font);
+  font-size: 12px;
+  color: var(--term-subdued);
+  opacity: 0.5;
+}
+
+/* Filter box in "add to playlist" etc. */
+html.terminal-full .main-contextMenu-filterInputContainer,
+html.terminal-full .main-contextMenu-filterInput {
+  border-radius: 0 !important;
+  font-family: var(--term-font) !important;
+}
+
+/* Rows fade in one after the other (first 8 only, 20ms apart). */
+html.terminal-full .main-contextMenu-menu > li {
+  animation: tf-row-in var(--tf-med) var(--tf-ease) both;
+}
+html.terminal-full .main-contextMenu-menu > li:nth-child(2) { animation-delay: 20ms; }
+html.terminal-full .main-contextMenu-menu > li:nth-child(3) { animation-delay: 40ms; }
+html.terminal-full .main-contextMenu-menu > li:nth-child(4) { animation-delay: 60ms; }
+html.terminal-full .main-contextMenu-menu > li:nth-child(5) { animation-delay: 80ms; }
+html.terminal-full .main-contextMenu-menu > li:nth-child(6) { animation-delay: 100ms; }
+html.terminal-full .main-contextMenu-menu > li:nth-child(7) { animation-delay: 120ms; }
+html.terminal-full .main-contextMenu-menu > li:nth-child(n + 8) { animation-delay: 140ms; }
+
+@keyframes tf-row-in {
+  from { opacity: 0; transform: translateX(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---- Tooltips: a one-line hint box -------------------------------------- */
+html.terminal-full [role="tooltip"],
+html.terminal-full .tippy-box:not(:has([role="menu"], [role="tooltip"])),
+html.terminal-full .main-contextMenu-tippy:not(:has([role="menu"], [role="tooltip"])) {
+  border-radius: 0 !important;
+  border: 1px solid var(--term-green-dim) !important;
+  background: var(--term-bg-elevated-hi) !important;
+  color: var(--term-text) !important;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45) !important;
+  font-family: var(--term-font) !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  line-height: 1.4 !important;
+  padding: 4px 8px !important;
+  animation: tf-tip-in var(--tf-fast) var(--tf-ease) both;
+}
+
+html.terminal-full [role="tooltip"]::before,
+html.terminal-full .main-contextMenu-tippy:not(:has([role="menu"], [role="tooltip"]))::before {
+  content: "› ";
+  color: var(--term-green);
+}
+
+@keyframes tf-tip-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---- Dialogs: a framed window with a title bar -------------------------- */
+html.terminal-full .GenericModal__overlay {
+  background: rgba(0, 0, 0, 0.72) !important;
+}
+
+html.terminal-full dialog::backdrop {
+  background: rgba(0, 0, 0, 0.72);
+}
+
+html.terminal-full .GenericModal,
+html.terminal-full [role="dialog"][aria-modal="true"],
+html.terminal-full .main-confirmDialog-container,
+html.terminal-full .desktopmodals-aboutSpotifyModal-container,
+html.terminal-full .desktopmodals-licensesModal-container,
+html.terminal-full .desktopmodals-versionStatus-container {
+  border-radius: 0 !important;
+  font-family: var(--term-font) !important;
+}
+
+/* Square everything inside a dialog: buttons, inputs, images, toggles. */
+html.terminal-full .GenericModal *,
+html.terminal-full [role="dialog"][aria-modal="true"] *,
+html.terminal-full .main-confirmDialog-container * {
+  border-radius: 0 !important;
+}
+
+html.terminal-full [role="dialog"][aria-modal="true"] :is(h1, h2, h3, p, span, button, input, label, textarea) {
+  font-family: var(--term-font) !important;
+}
+
+/* The window frame: 1px green border, hard shadow, and a title bar drawn
+   from the dialog's own aria-label ("┌─ Edit details"). The bar is
+   absolutely placed inside a reserved padding band, so it never joins
+   the dialog's own flex layout. */
+html.terminal-full .GenericModal {
+  position: relative;
+  padding-top: var(--tf-title-h) !important;
+  border: 1px solid var(--term-green) !important;
+  background: var(--term-bg-elevated) !important;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45) !important;
+  animation: tf-win-in var(--tf-med) var(--tf-ease) both;
+}
+
+html.terminal-full .GenericModal::before {
+  content: "┌─ " attr(aria-label) " ──────────────────────────────────────────────────────────────────────────────";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  height: var(--tf-title-h);
+  line-height: var(--tf-title-h);
+  padding: 0 10px;
+  overflow: hidden;
+  white-space: nowrap;
+  background: var(--term-bg-elevated-hi);
+  border-bottom: 1px solid var(--term-border);
+  color: var(--term-green);
+  font-family: var(--term-font);
+  font-size: 11.5px;
+  pointer-events: none;
+}
+
+@keyframes tf-win-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Spicetify's PopupModal (our settings, other extensions' popups) has a
+   real header: that header IS the title bar, so the generic strip goes. */
+html.terminal-full .GenericModal.spicetify-popup {
+  padding-top: 0 !important;
+}
+
+html.terminal-full .GenericModal.spicetify-popup::before {
+  content: none;
+}
+
+html.terminal-full .spicetify-popup-container {
+  border-radius: 0 !important;
+  background: var(--term-bg-elevated) !important;
+}
+
+html.terminal-full .spicetify-popup-header {
+  gap: 0 !important;
+  height: 36px;
+  padding: 0 0 0 12px !important;
+  background: var(--term-bg-elevated-hi);
+  border-bottom: 1px solid var(--term-border);
+}
+
+html.terminal-full .spicetify-popup-title {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-family: var(--term-font) !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  line-height: 36px !important;
+  color: var(--term-green) !important;
+}
+
+/* white-space: pre — these are flex items, which would otherwise drop the
+   spaces around the title ("┌─~/.terminalrc─"). */
+html.terminal-full .spicetify-popup-title::before {
+  content: "┌─ ";
+  white-space: pre;
+  flex: none;
+  color: var(--term-subdued);
+  font-weight: 400;
+}
+
+html.terminal-full .spicetify-popup-title::after {
+  content: " ──────────────────────────────────────────────────────────────────────────────";
+  white-space: pre;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--term-subdued);
+  font-weight: 400;
+}
+
+/* Close: the ✕ glyph in a square 36px cell; the svg (and its "Close"
+   aria-label on the button) stay for screen readers. */
+html.terminal-full .spicetify-popup-closeBtn,
+html.terminal-full .main-trackCreditsModal-closeBtn {
+  width: 36px !important;
+  height: 36px !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  border-left: 1px solid var(--term-border) !important;
+  color: var(--term-subdued) !important;
+  transition: background-color var(--tf-fast) var(--tf-ease), color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .spicetify-popup-closeBtn svg {
+  display: none;
+}
+
+html.terminal-full .spicetify-popup-closeBtn::before {
+  content: "✕";
+  font-family: var(--term-font);
+  font-size: 15px;
+  line-height: 1;
+}
+
+html.terminal-full .spicetify-popup-closeBtn:hover,
+html.terminal-full .main-trackCreditsModal-closeBtn:hover {
+  background: var(--term-red) !important;
+  color: var(--term-text) !important;
+}
+
+html.terminal-full .spicetify-popup-closeBtn:focus-visible {
+  outline: 1px solid var(--term-green) !important;
+  outline-offset: -3px !important;
+}
+
+html.terminal-full .spicetify-popup-content {
+  padding: 12px 16px 16px !important;
+}
+
+/* ---- Toasts: log lines, bottom-left ------------------------------------- */
+html.terminal-full .notistack-SnackbarContainer {
+  left: 16px !important;
+  right: auto !important;
+  bottom: calc(var(--now-playing-bar-height, 72px) + 12px) !important;
+  transform: none !important;
+  align-items: flex-start !important;
+}
+
+html.terminal-full .notistack-Snackbar > div,
+html.terminal-full .notistack-MuiContent {
+  display: flex !important;
+  align-items: center;
+  min-width: 0 !important;
+  min-height: 32px;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 6px 12px !important;
+  border-radius: 0 !important;
+  border: 1px solid var(--term-border) !important;
+  border-left: 2px solid var(--term-green) !important;
+  background: var(--term-bg-elevated) !important;
+  color: var(--term-text) !important;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45) !important;
+  font-family: var(--term-font) !important;
+  font-size: 12.5px !important;
+  font-weight: 400 !important;
+  animation: tf-log-in var(--tf-med) var(--tf-ease) both;
+}
+
+html.terminal-full .notistack-Snackbar > div *,
+html.terminal-full .notistack-MuiContent * {
+  font-family: var(--term-font) !important;
+  border-radius: 0 !important;
+}
+
+html.terminal-full .notistack-Snackbar > div::before,
+html.terminal-full .notistack-MuiContent::before {
+  content: "[ok]";
+  flex: none;
+  margin-right: 10px;
+  color: var(--term-green);
+  font-weight: 700;
+}
+
+/* Variants need to outrank ".notistack-Snackbar > div" above, hence the
+   repeated class / div qualifiers. */
+html.terminal-full .notistack-Snackbar > div.notistack-MuiContent-warning::before,
+html.terminal-full .notistack-MuiContent.notistack-MuiContent-warning::before {
+  content: "[warn]";
+  color: var(--term-orange);
+}
+
+html.terminal-full .notistack-Snackbar > div.notistack-MuiContent-warning,
+html.terminal-full .notistack-MuiContent.notistack-MuiContent-warning {
+  border-left-color: var(--term-orange) !important;
+}
+
+html.terminal-full .notistack-Snackbar > div.notistack-MuiContent-error,
+html.terminal-full .notistack-MuiContent.notistack-MuiContent-error,
+html.terminal-full .notistack-Snackbar > div[role="alert"]:not(.notistack-MuiContent) {
+  border-left-color: var(--term-red) !important;
+}
+
+html.terminal-full .notistack-Snackbar > div.notistack-MuiContent-error::before,
+html.terminal-full .notistack-MuiContent.notistack-MuiContent-error::before,
+html.terminal-full .notistack-Snackbar > div[role="alert"]:not(.notistack-MuiContent)::before {
+  content: "[err]";
+  color: var(--term-red);
+}
+
+@keyframes tf-log-in {
+  from { opacity: 0; transform: translateX(-16px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---- Branding: logos, footer, upsells (hidden, never removed) ----------- */
+/* Logos: the app-shell skeleton logo (shows before the UI mounts), the
+   legacy sidebar wordmark, and any svg/link labelled "Spotify". */
+html.terminal-full .main-appShell-logo,
+html.terminal-full .main-navBar-logo,
+html.terminal-full .premiumSpotifyIcon,
+html.terminal-full svg[aria-label="Spotify"],
+html.terminal-full [role="img"][aria-label="Spotify"],
+html.terminal-full .desktopmodals-aboutSpotifyModal-container svg,
+html.terminal-full .desktopmodals-aboutSpotifyModal-copyright {
+  visibility: hidden !important;
+}
+
+html.terminal-full a[aria-label="Spotify"] {
+  display: none !important;
+}
+
+/* Page footer (company/communities/legal links, "© Spotify AB"). The
+   legal pages stay reachable from the About dialog's licences link. */
+html.terminal-full .main-page-footerContainer,
+html.terminal-full .main-page-footerSectionWrapper {
+  display: none !important;
+}
+
+/* Premium upsells: buttons, nav items and menu entries (the whole <li>,
+   so no empty row is left in the menu). Hiding only — nothing here
+   touches ads, playback or any paid feature. */
+html.terminal-full .main-topBar-UpgradeButton,
+html.terminal-full .upgrade-button,
+html.terminal-full [data-testid="upgrade-button"],
+html.terminal-full [data-menu-item="upgrade-account"],
+html.terminal-full #upgradeAccount,
+html.terminal-full a[href*="spotify.com/premium"],
+html.terminal-full .main-navBar-premiumLink,
+html.terminal-full .main-navBar-premiumNavItem,
+html.terminal-full .main-contextMenu-menuItem:has(> [data-menu-item="upgrade-account"], > #upgradeAccount, > a[href*="spotify.com/premium"]),
+html.terminal-full [role="menu"] > li:has(> [data-menu-item="upgrade-account"], > #upgradeAccount, > a[href*="spotify.com/premium"]) {
+  display: none !important;
+}
+
+/* ---- Settings window (~/.terminalrc) ------------------------------------ */
+html.terminal-full .spicetify-popup:has(.terminal-settings) .spicetify-popup-container {
+  width: 560px;
+}
+
+html.terminal-full .terminal-settings {
+  min-width: 0;
+  font-size: 12.5px;
+}
+
+html.terminal-full .terminal-settings-row {
+  gap: 4px 10px;
+  min-height: 36px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--term-border);
+  transition: background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .terminal-settings-row:hover,
+html.terminal-full .terminal-settings-row:focus-within {
+  background: rgba(94, 189, 171, 0.1);
+  box-shadow: inset 2px 0 0 var(--term-green);
+}
+
+html.terminal-full .terminal-settings-row > label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 260px;
+  min-height: 36px;
+  cursor: pointer;
+}
+
+/* The mode row comes first (registry order): framed so the way back to
+   the native look is the most visible thing in the window. */
+html.terminal-full .terminal-settings-row:first-child {
+  margin-bottom: 8px;
+  border: 1px solid var(--term-green-dim);
+  background: var(--term-bg-tinted);
+}
+
+html.terminal-full .terminal-settings-row:first-child > label {
+  color: var(--term-green);
+  font-weight: 700;
+}
+
+/* Checkboxes as [x] / [ ]: same real <input>, same click target, same
+   keyboard behaviour — only its painting changes. */
+html.terminal-full .terminal-settings-row input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  width: auto;
+  height: auto;
+  margin: 0;
+  border: 0;
+  background: none;
+  font-family: var(--term-font);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--term-subdued);
+  cursor: pointer;
+}
+
+html.terminal-full .terminal-settings-row input[type="checkbox"]::before {
+  content: "[ ]";
+  white-space: pre;
+}
+
+html.terminal-full .terminal-settings-row input[type="checkbox"]:checked::before {
+  content: "[x]";
+  color: var(--term-green);
+}
+
+html.terminal-full .terminal-settings-row input[type="checkbox"]:focus-visible {
+  outline: 1px solid var(--term-green);
+  outline-offset: 2px;
+}
+
+html.terminal-full .terminal-settings-delay {
+  border-radius: 0;
+  height: 26px;
+}
+
+html.terminal-full .terminal-settings-delay:focus-visible {
+  outline: 1px solid var(--term-green);
+  outline-offset: 0;
+  border-color: var(--term-green);
+}
+
+html.terminal-full .terminal-settings-delay-group {
+  margin-left: 34px;
+}
+
+html.terminal-full .terminal-settings-hint::before {
+  content: "# ";
+  color: var(--term-green-dim);
+}
+
+html.terminal-full .terminal-settings::after {
+  content: "# ctrl+maj+alt+n : basculer terminal complet / natif · ctrl+maj+k : palette";
+  display: block;
+  margin-top: 6px;
+  color: var(--term-subdued);
+  font-size: 11px;
+}
+
+html.terminal-full.terminal-os-mac .terminal-settings::after {
+  content: "# cmd+maj+alt+n : basculer terminal complet / natif · cmd+maj+k : palette";
+}
 /* --- END FULL/CHROME ----------------------------------------------------- */
