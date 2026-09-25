@@ -34,7 +34,7 @@
 	// have Cascadia installed; Cascadia/Consolas only get reached on
 	// Windows (Menlo on macOS), where none of the Linux faces exist.
 	// Shown by the boot log and `neofetch`; keep in sync with CHANGELOG.md.
-	var THEME_VERSION = "1.1.2";
+	var THEME_VERSION = "1.2.0";
 
 	var TERM_FONT_STACK =
 		"'JetBrains Mono', 'Fira Code', 'Hack', 'DejaVu Sans Mono', " +
