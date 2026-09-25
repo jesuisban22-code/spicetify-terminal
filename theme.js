@@ -1415,6 +1415,197 @@
 	// --- END FULL/SHELL ----------------------------------------------------
 
 	// --- FULL/PLAYER: status line, right sidebar, fullscreen (agent B) ----
+	// The status line (user.css FULL/PLAYER) is almost all CSS. The one thing
+	// CSS can't read reliably is playback state: Spotify renders play vs
+	// pause as two different SVG paths, and the only other signal on the
+	// button is a localized aria-label ("Play", "Lecture", …). Matching
+	// either one is exactly what the brief rules out (path[d], localized
+	// labels). Shuffle/repeat do carry aria-checked in current builds, but
+	// that has moved between builds (class-only state in some), so this
+	// mirrors all four from Spicetify.Player onto <html> as data-* attributes:
+	//   data-tf-playback = playing | paused   (drives [ ▶ ] / [ ❚❚ ] and the
+	//                                           mode tag)
+	//   data-tf-shuffle  = 1 | 0
+	//   data-tf-repeat   = 0 | 1 | 2          (2 = repeat one → ↻¹)
+	//   data-tf-muted    = 1 | 0              ("vol" / "mute")
+	// The CSS reads them alongside the native attributes (either one turns a
+	// state on), and falls back to the native SVG when they're absent, so a
+	// Spicetify API change degrades to "Spotify's icon in brackets", never
+	// to a blank button.
+	// Same attributes go onto the mini-player's document when it's open
+	// (Document PiP is a separate document with its own <html>), so
+	// FULL_PLAYER_PIP_CSS below can show the same glyphs there.
+	// Updated on the player's own events (onplaypause, songchange), right
+	// after a click on a transport / mute button (shuffle/repeat/mute have
+	// no event), and by a cheap 1.5s poll that catches keyboard shortcuts
+	// and changes made from another device. Every write is skipped when the
+	// value is unchanged, so the poll causes no style recalcs.
+	var fullPlayer = { active: false, timer: null, onEvent: null, onClick: null, onPipEnter: null };
+	var FULL_PLAYER_ATTRS = ["data-tf-playback", "data-tf-shuffle", "data-tf-repeat", "data-tf-muted"];
+
+	function fullPlayerRoots() {
+		var roots = [document.documentElement];
+		try {
+			var pip = window.documentPictureInPicture && window.documentPictureInPicture.window;
+			if (pip && pip.document && pip.document.documentElement) roots.push(pip.document.documentElement);
+		} catch (e) {
+			/* PiP window closing mid-call — just skip it */
+		}
+		return roots;
+	}
+
+	function fullPlayerSetAttr(roots, name, value) {
+		for (var i = 0; i < roots.length; i++) {
+			if (value === null) {
+				if (roots[i].hasAttribute(name)) roots[i].removeAttribute(name);
+			} else if (roots[i].getAttribute(name) !== value) {
+				roots[i].setAttribute(name, value);
+			}
+		}
+	}
+
+	function fullPlayerSync() {
+		if (!fullPlayer.active) return;
+		var P = window.Spicetify && Spicetify.Player;
+		if (!P) return;
+		var roots = fullPlayerRoots();
+		try {
+			var paused = null;
+			if (P.data && typeof P.data.isPaused === "boolean") paused = P.data.isPaused;
+			else if (typeof P.isPlaying === "function") paused = !P.isPlaying();
+			var hasItem = !!(P.data && P.data.item);
+			// Nothing loaded: no attribute, so the mode tag reads "idle" and
+			// the play button keeps its native icon.
+			fullPlayerSetAttr(roots, "data-tf-playback", !hasItem || paused === null ? null : paused ? "paused" : "playing");
+			if (typeof P.getShuffle === "function") fullPlayerSetAttr(roots, "data-tf-shuffle", P.getShuffle() ? "1" : "0");
+			if (typeof P.getRepeat === "function") {
+				var r = Number(P.getRepeat()) || 0;
+				fullPlayerSetAttr(roots, "data-tf-repeat", String(r > 2 ? 2 : r < 0 ? 0 : r));
+			}
+			if (typeof P.getMute === "function") fullPlayerSetAttr(roots, "data-tf-muted", P.getMute() ? "1" : "0");
+		} catch (e) {
+			/* a Player getter throwing must not break the poll */
+		}
+	}
+
+	function setupFullPlayer() {
+		if (fullPlayer.active) return; // parts can be set up again on every toggle
+		fullPlayer.active = true;
+		var P = window.Spicetify && Spicetify.Player;
+
+		fullPlayer.onEvent = function () {
+			// songchange fires before Player.data reflects the new item on
+			// some builds; one frame later it's settled.
+			setTimeout(fullPlayerSync, 0);
+		};
+		if (P && typeof P.addEventListener === "function") {
+			P.addEventListener("onplaypause", fullPlayer.onEvent);
+			P.addEventListener("songchange", fullPlayer.onEvent);
+		}
+
+		fullPlayer.onClick = function (e) {
+			var t = e.target;
+			if (!t || !t.closest) return;
+			if (t.closest('[data-testid^="control-button-"], [data-testid="volume-bar-toggle-mute-button"]')) {
+				setTimeout(fullPlayerSync, 120);
+			}
+		};
+		document.addEventListener("click", fullPlayer.onClick, true);
+
+		if (window.documentPictureInPicture && window.documentPictureInPicture.addEventListener) {
+			fullPlayer.onPipEnter = function () { setTimeout(fullPlayerSync, 60); };
+			window.documentPictureInPicture.addEventListener("enter", fullPlayer.onPipEnter);
+		}
+
+		fullPlayer.timer = setInterval(fullPlayerSync, 1500);
+		fullPlayerSync();
+	}
+
+	function teardownFullPlayer() {
+		if (!fullPlayer.active) return;
+		fullPlayer.active = false;
+		var P = window.Spicetify && Spicetify.Player;
+		if (P && typeof P.removeEventListener === "function" && fullPlayer.onEvent) {
+			P.removeEventListener("onplaypause", fullPlayer.onEvent);
+			P.removeEventListener("songchange", fullPlayer.onEvent);
+		}
+		// Without removeEventListener the handler stays registered, but it
+		// only schedules fullPlayerSync, which returns early while inactive.
+		fullPlayer.onEvent = null;
+		if (fullPlayer.onClick) document.removeEventListener("click", fullPlayer.onClick, true);
+		fullPlayer.onClick = null;
+		if (fullPlayer.onPipEnter && window.documentPictureInPicture) {
+			window.documentPictureInPicture.removeEventListener("enter", fullPlayer.onPipEnter);
+		}
+		fullPlayer.onPipEnter = null;
+		clearInterval(fullPlayer.timer);
+		fullPlayer.timer = null;
+		var roots = fullPlayerRoots();
+		FULL_PLAYER_ATTRS.forEach(function (name) { fullPlayerSetAttr(roots, name, null); });
+	}
+
+	fullConversionParts.push({ setup: setupFullPlayer, teardown: teardownFullPlayer });
+
+	// Mini player (Document PiP) in full-conversion mode. user.css never
+	// reaches that document, and injectMiniPlayerStyle() (outside this
+	// section) only recolors it. This is the status line look for it, meant
+	// to be appended to that style tag when html.terminal-full is on:
+	// square everything, bracketed play button, glyph transport, and the
+	// block seek/volume bars. The PiP document can't see the main page's
+	// :root variables, so the palette is restated here, with the same values
+	// as user.css :root, which is also what injectMiniPlayerStyle already does.
+	// Play/pause glyphs use the data-tf-playback attribute that
+	// fullPlayerSync() also writes onto the PiP <html>; until it lands, the
+	// native icon shows between the brackets.
+	var FULL_PLAYER_PIP_CSS = [
+		":root {",
+		"  --term-bg: #15171c; --term-bg-tinted: #1a1c22; --term-bg-hi: #1f2229;",
+		"  --term-text: #e6e6e6; --term-subdued: #8a93a6; --term-border: #2b2e38;",
+		"  --term-green: #5ebdab;",
+		"}",
+		"*, *::before, *::after { border-radius: 0 !important; }",
+		"body { background: var(--term-bg) !important; }",
+		"img { outline: 1px solid var(--term-border); outline-offset: -1px; }",
+		":is([data-testid=\"control-button-shuffle\"], [data-testid=\"control-button-skip-back\"], [data-testid=\"control-button-skip-forward\"], [data-testid=\"control-button-repeat\"]) {",
+		"  min-width: 32px; height: 32px; display: inline-flex !important; align-items: center; justify-content: center;",
+		"  background: transparent !important; border: 1px solid transparent !important; color: var(--term-subdued) !important;",
+		"  font-size: 16px; line-height: 1; transform: none !important; transition: color 120ms, background-color 120ms;",
+		"}",
+		":is([data-testid=\"control-button-shuffle\"], [data-testid=\"control-button-skip-back\"], [data-testid=\"control-button-skip-forward\"], [data-testid=\"control-button-repeat\"]) svg { display: none !important; }",
+		"[data-testid=\"control-button-shuffle\"]::before { content: \"⤮\"; }",
+		"[data-testid=\"control-button-skip-back\"]::before { content: \"⏮\\FE0E\"; }",
+		"[data-testid=\"control-button-skip-forward\"]::before { content: \"⏭\\FE0E\"; }",
+		"[data-testid=\"control-button-repeat\"]::before { content: \"↻\"; }",
+		"[data-testid=\"control-button-repeat\"][aria-checked=\"mixed\"]::before, html[data-tf-repeat=\"2\"] [data-testid=\"control-button-repeat\"]::before { content: \"↻¹\"; }",
+		":is([data-testid=\"control-button-shuffle\"], [data-testid=\"control-button-skip-back\"], [data-testid=\"control-button-skip-forward\"], [data-testid=\"control-button-repeat\"])::after { display: none !important; }",
+		":is([data-testid=\"control-button-shuffle\"], [data-testid=\"control-button-skip-back\"], [data-testid=\"control-button-skip-forward\"], [data-testid=\"control-button-repeat\"]):hover { color: var(--term-text) !important; background-color: var(--term-bg-hi) !important; }",
+		":is([data-testid=\"control-button-shuffle\"], [data-testid=\"control-button-repeat\"]):is([aria-checked=\"true\"], [aria-checked=\"mixed\"]),",
+		"html[data-tf-shuffle=\"1\"] [data-testid=\"control-button-shuffle\"],",
+		"html:is([data-tf-repeat=\"1\"], [data-tf-repeat=\"2\"]) [data-testid=\"control-button-repeat\"] {",
+		"  color: var(--term-bg) !important; background-color: var(--term-green) !important;",
+		"}",
+		"[data-testid=\"control-button-playpause\"] {",
+		"  width: auto !important; min-width: 64px; height: 32px; padding: 0 8px !important; gap: 2px;",
+		"  display: inline-flex !important; align-items: center; justify-content: center;",
+		"  background: transparent !important; border: 1px solid var(--term-green) !important; color: var(--term-green) !important;",
+		"  font-size: 14px; font-weight: 700; line-height: 1; transform: none !important; box-shadow: none !important;",
+		"}",
+		"[data-testid=\"control-button-playpause\"]::before { content: \"[\"; }",
+		"[data-testid=\"control-button-playpause\"]::after { content: \"]\"; }",
+		"[data-testid=\"control-button-playpause\"] > span { display: inline-flex !important; align-items: center; justify-content: center; min-width: 3ch; width: auto !important; height: auto !important; background: transparent !important; color: inherit !important; }",
+		"[data-testid=\"control-button-playpause\"] svg { fill: currentColor; }",
+		"html[data-tf-playback] [data-testid=\"control-button-playpause\"] > span > * { display: none !important; }",
+		"html[data-tf-playback] [data-testid=\"control-button-playpause\"] > span::before { content: \"▶\\FE0E\"; }",
+		"html[data-tf-playback=\"playing\"] [data-testid=\"control-button-playpause\"] > span::before { content: \"❚❚\"; }",
+		"[data-testid=\"control-button-playpause\"]:hover { color: var(--term-bg) !important; background-color: var(--term-green) !important; }",
+		":is([data-testid=\"progress-bar-background\"], .x-progressBar-progressBarBg, .x-progressBar-background) {",
+		"  height: 8px !important; background-color: var(--term-border) !important;",
+		"  -webkit-mask-image: repeating-linear-gradient(90deg, var(--term-bg) 0 6px, transparent 6px 8px);",
+		"  mask-image: repeating-linear-gradient(90deg, var(--term-bg) 0 6px, transparent 6px 8px);",
+		"}",
+		":is(.x-progressBar-fillColor, .x-progressBar-foreground, .x-progressBar-progressFillColor) { background-color: var(--term-green) !important; }",
+		"[data-testid=\"progress-bar-handle\"] { width: 4px !important; height: 14px !important; background-color: var(--term-text) !important; box-shadow: none !important; }"
+	].join("\n");
 	// --- END FULL/PLAYER ---------------------------------------------------
 
 	// --- FULL/PAGES: home, search, headers, tracklists (agent C) ----------

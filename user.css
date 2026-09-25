@@ -1855,6 +1855,1201 @@ html.terminal-full .Root__nav-bar [data-encore-id="card"]:hover {
 /* --- END FULL/SHELL ------------------------------------------------------ */
 
 /* --- FULL/PLAYER (agent B) ----------------------------------------------- */
+/* The playbar becomes a tmux-style status line: a mode tag and the
+   now-playing widget on the left, the transport and a text-style seek bar
+   in the middle, and glyph buttons with short visible labels on the right.
+   The right sidebar panes (now playing view, queue, friend activity,
+   Connect devices), the fullscreen view and the lyrics view are restyled
+   to match.
+   Nothing is replaced. Every control is still Spotify's own button or
+   slider, so clicks, drags, keyboard focus and aria-labels behave as they
+   do natively; the glyphs are ::before/::after text and the native SVG is
+   only hidden.
+   Play/pause, shuffle, repeat and mute states are read from Spotify's own
+   attributes (aria-checked, data-active, .control-button--active). When a
+   build doesn't expose them, from Spicetify.Player via the
+   data-tf-playback / data-tf-shuffle / data-tf-repeat / data-tf-muted
+   attributes that theme.js (FULL/PLAYER) keeps on <html>. Glyph content is
+   passed through --tfp-glyph / --tfp-label so each button is one short
+   rule. */
+
+/* ---------- 1. Status line frame ---------------------------------------- */
+html.terminal-full .Root__now-playing-bar {
+  border-top: 1px solid var(--term-border);
+  background-color: var(--term-bg-tinted) !important;
+}
+
+/* The v1.2 pulse was a 3px gradient bar. Here it becomes a 1px line along
+   the status line's top edge, tinted with the track color. It only
+   breathes in opacity, so the bar's top gets a hint of the track's color
+   without the whole bar being flooded with it. */
+html.terminal-full .Root__now-playing-bar::before {
+  inset: -1px 0 auto 0;
+  height: 1px;
+  background: var(--track-accent, var(--term-green));
+  animation: tfp-breathe var(--track-bpm-ms, 2400ms) ease-in-out infinite;
+}
+
+@keyframes tfp-breathe {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.9; }
+}
+
+html.terminal-full .Root__now-playing-bar *,
+html.terminal-full .Root__now-playing-bar *::before,
+html.terminal-full .Root__now-playing-bar *::after {
+  border-radius: 0 !important;
+}
+
+html.terminal-full .main-nowPlayingBar-nowPlayingBar,
+html.terminal-full .main-nowPlayingBar-container {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html.terminal-full .main-nowPlayingBar-nowPlayingBar {
+  padding-left: 0 !important;
+}
+
+/* Segments are separated by 1px rules, the way tmux separates status
+   fields. */
+html.terminal-full .main-nowPlayingBar-left {
+  position: relative;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding-left: 84px !important;
+  padding-right: 12px;
+  border-right: 1px solid var(--term-border);
+  min-width: 0;
+}
+
+html.terminal-full .main-nowPlayingBar-right {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding-left: 12px;
+  border-left: 1px solid var(--term-border);
+}
+
+/* Mode tag, like vim's "-- INSERT --" or tmux's session block: says at a
+   glance whether music is playing. It is decorative only
+   (pseudo-element, no pointer events), and the real play button stays in
+   the center. */
+html.terminal-full .main-nowPlayingBar-left::before {
+  content: "idle";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--term-subdued);
+  background: var(--term-bg-elevated);
+  border-right: 1px solid var(--term-border);
+  pointer-events: none;
+  transition: background-color var(--tf-med) var(--tf-ease), color var(--tf-med) var(--tf-ease);
+}
+
+html.terminal-full[data-tf-playback="playing"] .main-nowPlayingBar-left::before {
+  content: "▶\FE0E  play";
+  color: var(--term-bg);
+  background: var(--term-green);
+}
+
+html.terminal-full[data-tf-playback="paused"] .main-nowPlayingBar-left::before {
+  content: "❚❚ pause";
+  color: var(--term-text);
+}
+
+/* ---------- 1a. Now-playing widget (left segment) ----------------------- */
+html.terminal-full [data-testid="now-playing-widget"] {
+  gap: 10px;
+  min-width: 0;
+}
+
+/* Small square cover with a 1px frame. The ASCII canvas theme.js draws in
+   .main-nowPlayingWidget-coverArtContainer is absolutely positioned at
+   inset 0, so it follows whatever size the container ends up with. */
+html.terminal-full .main-nowPlayingWidget-coverArt {
+  flex: 0 0 auto;
+  outline: 1px solid var(--term-border);
+  outline-offset: 2px;
+  transition: outline-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .main-nowPlayingWidget-coverArt:hover {
+  outline-color: var(--term-green);
+}
+
+html.terminal-full .main-nowPlayingWidget-coverArt :is(.main-nowPlayingWidget-coverArtContainer, .cover-art, [data-testid="cover-art-button"], img) {
+  width: 44px !important;
+  height: 44px !important;
+  box-shadow: none !important;
+}
+
+/* The pulse's cover glow (a big blurred radial bloom in v1.2) becomes a
+   hairline frame in the track color, pulsing in opacity only. */
+html.terminal-full .main-nowPlayingWidget-coverArt::after {
+  inset: 0;
+  background: none;
+  filter: none;
+  border: 1px solid var(--track-accent, var(--term-green));
+  z-index: 3;
+  animation: tfp-breathe var(--track-bpm-ms, 2400ms) ease-in-out infinite;
+}
+
+html.terminal-full .main-nowPlayingWidget-trackInfo {
+  min-width: 0;
+}
+
+html.terminal-full .main-nowPlayingWidget-trackInfo .main-trackInfo-name {
+  font-size: 13px !important;
+  font-weight: 700;
+}
+
+html.terminal-full .main-nowPlayingWidget-trackInfo .main-trackInfo-name a::before {
+  content: "♪ ";
+  color: var(--term-green);
+}
+
+html.terminal-full .main-nowPlayingWidget-trackInfo .main-trackInfo-artists {
+  display: flex !important;
+  align-items: baseline;
+  min-width: 0;
+  font-size: 12px !important;
+}
+
+html.terminal-full .main-nowPlayingWidget-trackInfo .main-trackInfo-artists::before {
+  content: "— ";
+  flex: 0 0 auto;
+  white-space: pre;
+  color: var(--term-subdued);
+}
+
+html.terminal-full .main-nowPlayingWidget-trackInfo .main-trackInfo-artists > * {
+  min-width: 0;
+}
+
+html.terminal-full .main-nowPlayingWidget-trackInfo a {
+  transition: color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .main-nowPlayingWidget-trackInfo a:hover {
+  color: var(--term-green) !important;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Like / add-to-library: ＋ when not saved, ♥ in green when saved. Spotify
+   exposes the saved state as aria-checked on this button in every build
+   seen so far. */
+html.terminal-full [data-testid="now-playing-widget"] button:is([aria-checked], .main-addButton-button, .control-button-heart),
+html.terminal-full .main-nowPlayingWidget-plusButton button {
+  --tfp-glyph: "＋";
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  color: var(--term-subdued) !important;
+  font-size: 15px;
+  transform: none !important;
+  transition: color var(--tf-fast) var(--tf-ease), border-color var(--tf-fast) var(--tf-ease), background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full [data-testid="now-playing-widget"] button:is([aria-checked], .main-addButton-button, .control-button-heart) svg,
+html.terminal-full .main-nowPlayingWidget-plusButton button svg {
+  display: none !important;
+}
+
+html.terminal-full [data-testid="now-playing-widget"] button:is([aria-checked], .main-addButton-button, .control-button-heart)::before,
+html.terminal-full .main-nowPlayingWidget-plusButton button::before {
+  content: var(--tfp-glyph);
+  line-height: 1;
+}
+
+html.terminal-full [data-testid="now-playing-widget"] button:is([aria-checked="true"], .main-addButton-active),
+html.terminal-full .main-nowPlayingWidget-plusButton button:is([aria-checked="true"], .main-addButton-active) {
+  --tfp-glyph: "♥\FE0E";
+  color: var(--term-green) !important;
+}
+
+html.terminal-full [data-testid="now-playing-widget"] button:is([aria-checked], .main-addButton-button, .control-button-heart):hover,
+html.terminal-full .main-nowPlayingWidget-plusButton button:hover {
+  color: var(--term-text) !important;
+  border-color: var(--term-border) !important;
+  background-color: var(--term-bg-hi) !important;
+}
+
+/* ---------- 1b. Transport (center segment) ------------------------------
+   Selectors are Spotify's own data-testids, not scoped to the playbar, so
+   the same look carries into the fullscreen view (.npv-nowPlayingBar-*)
+   automatically. */
+html.terminal-full .player-controls__buttons {
+  gap: 6px !important;
+  margin-bottom: 4px;
+}
+
+html.terminal-full .player-controls__left,
+html.terminal-full .player-controls__right {
+  gap: 4px !important;
+}
+
+html.terminal-full :is(
+  [data-testid="control-button-shuffle"],
+  [data-testid="control-button-skip-back"],
+  [data-testid="control-button-skip-forward"],
+  [data-testid="control-button-repeat"],
+  [data-testid="control-button-seek-back-15"],
+  [data-testid="control-button-seek-forward-15"],
+  [data-testid="control-button-sleep-timer"],
+  [data-testid="control-button-npv-episodes"]
+) {
+  position: relative;
+  min-width: 32px !important;
+  width: auto !important;
+  height: 32px !important;
+  padding: 0 6px !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  color: var(--term-subdued) !important;
+  font-size: 16px;
+  line-height: 1;
+  white-space: nowrap;
+  transform: none !important;
+  transition: color var(--tf-fast) var(--tf-ease), background-color var(--tf-fast) var(--tf-ease), border-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full [data-testid="control-button-shuffle"] { --tfp-glyph: "⤮"; }
+html.terminal-full [data-testid="control-button-skip-back"] { --tfp-glyph: "⏮\FE0E"; }
+html.terminal-full [data-testid="control-button-skip-forward"] { --tfp-glyph: "⏭\FE0E"; }
+html.terminal-full [data-testid="control-button-repeat"] { --tfp-glyph: "↻"; }
+html.terminal-full [data-testid="control-button-seek-back-15"] { --tfp-glyph: "-15s"; }
+html.terminal-full [data-testid="control-button-seek-forward-15"] { --tfp-glyph: "+15s"; }
+html.terminal-full [data-testid="control-button-sleep-timer"] { --tfp-glyph: "zZ"; }
+html.terminal-full [data-testid="control-button-npv-episodes"] { --tfp-glyph: "≡"; }
+
+html.terminal-full [data-testid="control-button-repeat"]:is([aria-checked="mixed"]),
+html.terminal-full[data-tf-repeat="2"] [data-testid="control-button-repeat"] {
+  --tfp-glyph: "↻¹";
+}
+
+html.terminal-full :is(
+  [data-testid="control-button-shuffle"],
+  [data-testid="control-button-skip-back"],
+  [data-testid="control-button-skip-forward"],
+  [data-testid="control-button-repeat"],
+  [data-testid="control-button-seek-back-15"],
+  [data-testid="control-button-seek-forward-15"],
+  [data-testid="control-button-sleep-timer"],
+  [data-testid="control-button-npv-episodes"]
+) svg {
+  display: none !important;
+}
+
+html.terminal-full :is(
+  [data-testid="control-button-shuffle"],
+  [data-testid="control-button-skip-back"],
+  [data-testid="control-button-skip-forward"],
+  [data-testid="control-button-repeat"],
+  [data-testid="control-button-seek-back-15"],
+  [data-testid="control-button-seek-forward-15"],
+  [data-testid="control-button-sleep-timer"],
+  [data-testid="control-button-npv-episodes"]
+)::before {
+  content: var(--tfp-glyph);
+  position: static;
+  font-size: inherit;
+  line-height: 1;
+}
+
+/* ::after is Spotify's green "active" dot on these buttons. It is taken
+   over for the hover underline sweep, and active state is shown as inverse
+   video instead of the dot. */
+html.terminal-full :is(
+  [data-testid="control-button-shuffle"],
+  [data-testid="control-button-skip-back"],
+  [data-testid="control-button-skip-forward"],
+  [data-testid="control-button-repeat"],
+  [data-testid="control-button-seek-back-15"],
+  [data-testid="control-button-seek-forward-15"],
+  [data-testid="control-button-sleep-timer"],
+  [data-testid="control-button-npv-episodes"]
+)::after {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  inset: auto 5px 4px 5px !important;
+  width: auto !important;
+  height: 1px !important;
+  background: var(--term-green) !important;
+  opacity: 1 !important;
+  border-radius: 0 !important;
+  transform: scaleX(0) !important;
+  transform-origin: left center;
+  transition: transform var(--tf-med) var(--tf-ease);
+}
+
+html.terminal-full :is(
+  [data-testid="control-button-shuffle"],
+  [data-testid="control-button-skip-back"],
+  [data-testid="control-button-skip-forward"],
+  [data-testid="control-button-repeat"],
+  [data-testid="control-button-seek-back-15"],
+  [data-testid="control-button-seek-forward-15"],
+  [data-testid="control-button-sleep-timer"],
+  [data-testid="control-button-npv-episodes"]
+):is(:hover, :focus-visible) {
+  color: var(--term-text) !important;
+  background-color: var(--term-bg-hi) !important;
+}
+
+html.terminal-full :is(
+  [data-testid="control-button-shuffle"],
+  [data-testid="control-button-skip-back"],
+  [data-testid="control-button-skip-forward"],
+  [data-testid="control-button-repeat"],
+  [data-testid="control-button-seek-back-15"],
+  [data-testid="control-button-seek-forward-15"],
+  [data-testid="control-button-sleep-timer"],
+  [data-testid="control-button-npv-episodes"]
+):is(:hover, :focus-visible)::after {
+  transform: scaleX(1) !important;
+}
+
+html.terminal-full :is(
+  [data-testid="control-button-shuffle"],
+  [data-testid="control-button-skip-back"],
+  [data-testid="control-button-skip-forward"],
+  [data-testid="control-button-repeat"]
+):active {
+  transform: translateY(1px) !important;
+}
+
+/* Active shuffle / repeat: inverse video (green block, dark glyph), the
+   way a terminal shows a selected item. */
+html.terminal-full :is([data-testid="control-button-shuffle"], [data-testid="control-button-repeat"]):is([aria-checked="true"], [aria-checked="mixed"], .control-button--active, .main-shuffleButton-active, .main-repeatButton-active),
+html.terminal-full[data-tf-shuffle="1"] [data-testid="control-button-shuffle"],
+html.terminal-full:is([data-tf-repeat="1"], [data-tf-repeat="2"]) [data-testid="control-button-repeat"] {
+  color: var(--term-bg) !important;
+  background-color: var(--term-green) !important;
+  border-color: var(--term-green) !important;
+}
+
+html.terminal-full :is([data-testid="control-button-shuffle"], [data-testid="control-button-repeat"]):is([aria-checked="true"], [aria-checked="mixed"], .control-button--active, .main-shuffleButton-active, .main-repeatButton-active)::after,
+html.terminal-full[data-tf-shuffle="1"] [data-testid="control-button-shuffle"]::after,
+html.terminal-full:is([data-tf-repeat="1"], [data-tf-repeat="2"]) [data-testid="control-button-repeat"]::after {
+  background: var(--term-bg) !important;
+}
+
+html.terminal-full :is([data-testid^="control-button-"])[disabled],
+html.terminal-full :is([data-testid^="control-button-"])[aria-disabled="true"] {
+  opacity: 0.35;
+}
+
+/* Play/pause: no more white circle. A bracketed text button, [ ▶ ] or
+   [ ❚❚ ], outlined in green and inverse on hover. The glyph comes from
+   data-tf-playback (set by theme.js). Without it the native SVG stays
+   visible between the brackets, so the button never ends up blank. */
+html.terminal-full [data-testid="control-button-playpause"] {
+  position: relative;
+  width: auto !important;
+  min-width: 68px !important;
+  height: 32px !important;
+  min-height: 32px;
+  margin: 0 6px;
+  padding: 0 8px !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: transparent !important;
+  border: 1px solid var(--term-green) !important;
+  color: var(--term-green) !important;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: none !important;
+  transform: none !important;
+  transition: color var(--tf-fast) var(--tf-ease), background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full [data-testid="control-button-playpause"]::before { content: "["; }
+html.terminal-full [data-testid="control-button-playpause"]::after { content: "]"; }
+
+html.terminal-full [data-testid="control-button-playpause"] > span {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  min-width: 3ch;
+  width: auto !important;
+  height: auto !important;
+  padding: 0 !important;
+  background: transparent !important;
+  color: inherit !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+html.terminal-full [data-testid="control-button-playpause"] svg {
+  fill: currentColor;
+  color: inherit !important;
+}
+
+html.terminal-full[data-tf-playback] [data-testid="control-button-playpause"] > span > * {
+  display: none !important;
+}
+
+html.terminal-full[data-tf-playback] [data-testid="control-button-playpause"] > span::before {
+  content: "▶\FE0E";
+}
+
+html.terminal-full[data-tf-playback="playing"] [data-testid="control-button-playpause"] > span::before {
+  content: "❚❚";
+  letter-spacing: -0.1em;
+}
+
+html.terminal-full [data-testid="control-button-playpause"]:is(:hover, :focus-visible) {
+  color: var(--term-bg) !important;
+  background-color: var(--term-green) !important;
+}
+
+html.terminal-full [data-testid="control-button-playpause"]:active {
+  transform: translateY(1px) !important;
+}
+
+/* ---------- 1c. Seek bar: [██████░░░░░░] 1:23/3:45 ----------------------
+   The native slider stays the draggable element (with its hidden
+   <input type=range> for the keyboard). Only the look changes: the track
+   is cut into blocks by a mask, the filled part is green and the empty
+   part is a dim block. Both time labels move to the right of the bar with
+   CSS `order`, which reorders the rendering without moving any node.
+   theme.js's tempo markers (.terminal-tempo-markers, appended to
+   [data-testid="progress-bar"]) become ruler ticks just above the blocks. */
+html.terminal-full .playback-bar {
+  gap: 0 !important;
+  font-size: 11px;
+}
+
+html.terminal-full .playback-bar :is(.playback-bar__progress-time-elapsed, [data-testid="playback-position"]) {
+  order: 2;
+  min-width: 0 !important;
+  margin-left: 18px;
+  text-align: right;
+  color: var(--term-text) !important;
+  font-size: 11px !important;
+  font-variant-numeric: tabular-nums;
+}
+
+html.terminal-full .playback-bar :is(.main-playbackBarRemainingTime-container, [data-testid="playback-duration"]) {
+  order: 3;
+  min-width: 0 !important;
+  text-align: left;
+  color: var(--term-subdued) !important;
+  font-size: 11px !important;
+  font-variant-numeric: tabular-nums;
+}
+
+html.terminal-full .playback-bar :is(.main-playbackBarRemainingTime-container, [data-testid="playback-duration"])::before {
+  content: "/";
+  color: var(--term-subdued);
+  margin: 0 2px;
+}
+
+html.terminal-full .playback-bar [data-testid="progress-bar"] {
+  --progress-bar-height: 10px !important;
+  --progress-bar-radius: 0 !important;
+  margin: 0 12px;
+  overflow: visible !important;
+}
+
+html.terminal-full .playback-bar [data-testid="progress-bar"]::before,
+html.terminal-full .playback-bar [data-testid="progress-bar"]::after {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  line-height: 1;
+  color: var(--term-subdued);
+  pointer-events: none;
+}
+
+html.terminal-full .playback-bar [data-testid="progress-bar"]::before { content: "["; left: -11px; }
+html.terminal-full .playback-bar [data-testid="progress-bar"]::after { content: "]"; right: -11px; }
+
+html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) :is([data-testid="progress-bar-background"], .x-progressBar-progressBarBg, .x-progressBar-background) {
+  height: 10px !important;
+  border-radius: 0 !important;
+  background-color: var(--term-border) !important;
+  -webkit-mask-image: repeating-linear-gradient(90deg, var(--term-bg) 0 6px, transparent 6px 8px);
+  mask-image: repeating-linear-gradient(90deg, var(--term-bg) 0 6px, transparent 6px 8px);
+  transition: background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) :is(.x-progressBar-fillColor, .x-progressBar-foreground, .x-progressBar-progressFillColor) {
+  background-color: var(--term-green) !important;
+  border-radius: 0 !important;
+}
+
+html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) [data-testid="progress-bar"]:hover :is([data-testid="progress-bar-background"], .x-progressBar-progressBarBg, .x-progressBar-background) {
+  background-color: var(--term-subdued) !important;
+}
+
+/* Handle: a thin block cursor instead of the v1.2 10px square. */
+html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) [data-testid="progress-bar-handle"] {
+  width: 4px !important;
+  height: 16px !important;
+  background-color: var(--term-text) !important;
+  box-shadow: 0 0 0 1px var(--term-bg) !important;
+}
+
+html.terminal-full .playback-bar .terminal-tempo-tick {
+  top: -5px;
+  bottom: auto;
+  height: 3px;
+  width: 1px;
+  background: var(--term-subdued);
+  opacity: 0.7;
+}
+
+/* ---------- 1d. Right segment: labelled glyph buttons ------------------ */
+html.terminal-full .main-nowPlayingBar-extraControls {
+  gap: 2px !important;
+}
+
+/* Any button there (including ones added by extensions) gets the same
+   square frame and hover. Known ones also swap their icon for a glyph and
+   a short label below it (see next rules). */
+html.terminal-full .main-nowPlayingBar-extraControls button {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  color: var(--term-subdued) !important;
+  transform: none !important;
+  transition: color var(--tf-fast) var(--tf-ease), background-color var(--tf-fast) var(--tf-ease), border-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .main-nowPlayingBar-extraControls button:is(:hover, :focus-visible) {
+  color: var(--term-text) !important;
+  background-color: var(--term-bg-hi) !important;
+  border-color: var(--term-border) !important;
+}
+
+html.terminal-full [data-testid="control-button-npv"] { --tfp-glyph: "▣"; --tfp-label: "now"; }
+html.terminal-full [data-testid="lyrics-button"] { --tfp-glyph: "¶"; --tfp-label: "lyrics"; }
+html.terminal-full [data-testid="control-button-queue"] { --tfp-glyph: "≡"; --tfp-label: "queue"; }
+html.terminal-full .main-nowPlayingBar-extraControls :is(.main-devicePicker-controlButton, button[aria-describedby*="connect"]) { --tfp-glyph: "⇆"; --tfp-label: "device"; }
+html.terminal-full [data-testid="pip-toggle-button"] { --tfp-glyph: "⧉"; --tfp-label: "mini"; }
+html.terminal-full [data-testid="fullscreen-mode-button"] { --tfp-glyph: "⤢"; --tfp-label: "full"; }
+
+html.terminal-full :is(
+  [data-testid="control-button-npv"],
+  [data-testid="lyrics-button"],
+  [data-testid="control-button-queue"],
+  [data-testid="pip-toggle-button"],
+  [data-testid="fullscreen-mode-button"]
+),
+html.terminal-full .main-nowPlayingBar-extraControls :is(.main-devicePicker-controlButton, button[aria-describedby*="connect"]) {
+  position: relative;
+  width: auto !important;
+  min-width: 40px !important;
+  height: 40px !important;
+  padding: 3px 4px !important;
+  display: inline-flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  line-height: 1;
+}
+
+html.terminal-full :is(
+  [data-testid="control-button-npv"],
+  [data-testid="lyrics-button"],
+  [data-testid="control-button-queue"],
+  [data-testid="pip-toggle-button"],
+  [data-testid="fullscreen-mode-button"]
+) svg,
+html.terminal-full .main-nowPlayingBar-extraControls :is(.main-devicePicker-controlButton, button[aria-describedby*="connect"]) svg {
+  display: none !important;
+}
+
+html.terminal-full :is(
+  [data-testid="control-button-npv"],
+  [data-testid="lyrics-button"],
+  [data-testid="control-button-queue"],
+  [data-testid="pip-toggle-button"],
+  [data-testid="fullscreen-mode-button"]
+)::before,
+html.terminal-full .main-nowPlayingBar-extraControls :is(.main-devicePicker-controlButton, button[aria-describedby*="connect"])::before {
+  content: var(--tfp-glyph);
+  position: static;
+  font-size: 15px;
+  line-height: 16px;
+}
+
+/* ::after is the label, which also takes over Spotify's active dot. */
+html.terminal-full :is(
+  [data-testid="control-button-npv"],
+  [data-testid="lyrics-button"],
+  [data-testid="control-button-queue"],
+  [data-testid="pip-toggle-button"],
+  [data-testid="fullscreen-mode-button"]
+)::after,
+html.terminal-full .main-nowPlayingBar-extraControls :is(.main-devicePicker-controlButton, button[aria-describedby*="connect"])::after {
+  content: var(--tfp-label) !important;
+  display: block !important;
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  background: none !important;
+  transform: none !important;
+  opacity: 1 !important;
+  font-size: 9px;
+  line-height: 10px;
+  letter-spacing: 0.02em;
+  color: inherit;
+}
+
+/* Open panel / active view: inverse video instead of the green dot. */
+html.terminal-full :is(
+  [data-testid="control-button-npv"],
+  [data-testid="lyrics-button"],
+  [data-testid="control-button-queue"],
+  [data-testid="pip-toggle-button"],
+  [data-testid="fullscreen-mode-button"]
+):is([data-active="true"], [aria-pressed="true"], .control-button--active),
+html.terminal-full .main-nowPlayingBar-extraControls :is(.main-devicePicker-controlButton, button[aria-describedby*="connect"]):is([data-active="true"], [aria-pressed="true"], [aria-expanded="true"], .control-button--active, .main-devicePicker-connected) {
+  color: var(--term-bg) !important;
+  background-color: var(--term-green) !important;
+  border-color: var(--term-green) !important;
+}
+
+/* Volume: "vol" text on the mute toggle plus the same blocks as the seek
+   bar (▮▮▮▯▯), still the native draggable slider. */
+html.terminal-full [data-testid="volume-bar"] {
+  gap: 4px;
+  align-items: center;
+}
+
+html.terminal-full [data-testid="volume-bar-toggle-mute-button"] {
+  width: auto !important;
+  min-width: 40px !important;
+  height: 32px !important;
+  padding: 0 4px !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  color: var(--term-subdued) !important;
+  font-size: 11px;
+  transform: none !important;
+  transition: color var(--tf-fast) var(--tf-ease), border-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full [data-testid="volume-bar-toggle-mute-button"] svg {
+  display: none !important;
+}
+
+html.terminal-full [data-testid="volume-bar-toggle-mute-button"]::before {
+  content: "vol";
+}
+
+html.terminal-full[data-tf-muted="1"] [data-testid="volume-bar-toggle-mute-button"]::before {
+  content: "mute";
+  text-decoration: line-through;
+}
+
+html.terminal-full [data-testid="volume-bar-toggle-mute-button"]:is(:hover, :focus-visible) {
+  color: var(--term-text) !important;
+  border-color: var(--term-border) !important;
+}
+
+html.terminal-full [data-testid="volume-bar"] :is([data-testid="progress-bar-background"], .x-progressBar-progressBarBg, .x-progressBar-background) {
+  -webkit-mask-image: repeating-linear-gradient(90deg, var(--term-bg) 0 8px, transparent 8px 11px);
+  mask-image: repeating-linear-gradient(90deg, var(--term-bg) 0 8px, transparent 8px 11px);
+}
+
+html.terminal-full [data-testid="volume-bar"] [data-testid="progress-bar"] {
+  --progress-bar-height: 10px !important;
+  --progress-bar-radius: 0 !important;
+}
+
+/* The green "Listening on <device>" strip under the bar. */
+html.terminal-full .main-connectBar-connectBar {
+  background: var(--term-bg-elevated) !important;
+  color: var(--term-green) !important;
+  border-top: 1px solid var(--term-border);
+  font-size: 11px;
+}
+
+html.terminal-full .main-connectBar-connectBar :is(svg, path) {
+  fill: var(--term-green) !important;
+  color: var(--term-green) !important;
+}
+
+html.terminal-full .main-connectBar-connectBar::before {
+  content: "⇆ ";
+  margin-right: 4px;
+}
+
+/* Narrow windows: drop the text labels and the mode tag. The buttons keep
+   their glyph and Spotify's own tooltip, so they stay identifiable. */
+@media (max-width: 1100px) {
+  html.terminal-full :is(
+    [data-testid="control-button-npv"],
+    [data-testid="lyrics-button"],
+    [data-testid="control-button-queue"],
+    [data-testid="pip-toggle-button"],
+    [data-testid="fullscreen-mode-button"]
+  )::after,
+  html.terminal-full .main-nowPlayingBar-extraControls :is(.main-devicePicker-controlButton, button[aria-describedby*="connect"])::after {
+    display: none !important;
+  }
+
+  html.terminal-full :is(
+    [data-testid="control-button-npv"],
+    [data-testid="lyrics-button"],
+    [data-testid="control-button-queue"],
+    [data-testid="pip-toggle-button"],
+    [data-testid="fullscreen-mode-button"]
+  ),
+  html.terminal-full .main-nowPlayingBar-extraControls :is(.main-devicePicker-controlButton, button[aria-describedby*="connect"]) {
+    min-width: 32px !important;
+    height: 32px !important;
+  }
+
+  html.terminal-full [data-testid="volume-bar-toggle-mute-button"] {
+    min-width: 32px !important;
+  }
+
+  html.terminal-full [data-testid="volume-bar"] {
+    width: auto !important;
+  }
+
+  html.terminal-full [data-testid="volume-bar"] > :not(button) {
+    width: 56px !important;
+    flex: 0 0 56px !important;
+  }
+
+  html.terminal-full .main-nowPlayingBar-right {
+    padding-left: 6px;
+  }
+
+  html.terminal-full .playback-bar :is(.playback-bar__progress-time-elapsed, [data-testid="playback-position"]) {
+    margin-left: 14px;
+  }
+
+  html.terminal-full .main-nowPlayingBar-left {
+    padding-left: 12px !important;
+  }
+
+  html.terminal-full .main-nowPlayingBar-left::before {
+    display: none;
+  }
+}
+
+/* ---------- 2. Right sidebar: terminal panes ---------------------------
+   Now Playing view, queue, friend activity and Connect devices all live
+   in aside#Desktop_PanelContainer_Id. Headings get a "# " prefix, lists
+   become ls-style rows, and cards are square boxes with 1px borders. Merch
+   is hidden, and so are Premium upsell links. */
+html.terminal-full #Desktop_PanelContainer_Id *,
+html.terminal-full #Desktop_PanelContainer_Id *::before,
+html.terminal-full #Desktop_PanelContainer_Id *::after {
+  border-radius: 0 !important;
+}
+
+html.terminal-full #Desktop_PanelContainer_Id :is(.main-nowPlayingView-gradient, .main-nowPlayingView-content, .main-buddyFeed-container) {
+  background-image: none !important;
+  background-color: var(--term-bg) !important;
+}
+
+html.terminal-full #Desktop_PanelContainer_Id :is(h2, h3),
+html.terminal-full #Desktop_PanelContainer_Id :is(.main-nowPlayingView-sectionHeaderText, .main-buddyFeed-headerTitle, .main-devicePicker-sectionHeading, .main-devicePicker-headingTitle, .main-devicePicker-heading:not(:has(.main-devicePicker-headingTitle)), .main-nowPlayingView-creditsHeader):not(:is(h2, h3, h2 *, h3 *)):not(:has(h2, h3)) {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0 !important;
+}
+
+html.terminal-full #Desktop_PanelContainer_Id :is(h2, h3)::before,
+html.terminal-full #Desktop_PanelContainer_Id :is(.main-nowPlayingView-sectionHeaderText, .main-buddyFeed-headerTitle, .main-devicePicker-sectionHeading, .main-devicePicker-headingTitle, .main-devicePicker-heading:not(:has(.main-devicePicker-headingTitle)), .main-nowPlayingView-creditsHeader):not(:is(h2, h3, h2 *, h3 *)):not(:has(h2, h3))::before {
+  content: "# ";
+  color: var(--term-green);
+}
+
+/* Panel header (title + "…" + close ✕) */
+html.terminal-full :is(.main-nowPlayingView-header, .main-nowPlayingView-headerContainer) {
+  border-bottom: 1px solid var(--term-border);
+  background: var(--term-bg) !important;
+}
+
+html.terminal-full [data-testid="PanelHeader_CloseButton"] svg {
+  display: none !important;
+}
+
+html.terminal-full [data-testid="PanelHeader_CloseButton"] {
+  min-width: 32px;
+  min-height: 32px;
+  color: var(--term-subdued) !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  transition: color var(--tf-fast) var(--tf-ease), border-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full [data-testid="PanelHeader_CloseButton"]::before {
+  content: "✕";
+  font-size: 14px;
+}
+
+html.terminal-full [data-testid="PanelHeader_CloseButton"]:is(:hover, :focus-visible) {
+  color: var(--term-text) !important;
+  border-color: var(--term-border) !important;
+}
+
+/* Now Playing view: cover, title, and cards (about, credits, tour, queue) */
+html.terminal-full .main-nowPlayingView-coverArtContainer {
+  outline: 1px solid var(--term-border);
+  outline-offset: 3px;
+}
+
+html.terminal-full .main-nowPlayingView-contextItemInfo :is(a, span)[data-encore-id="text"],
+html.terminal-full .main-nowPlayingView-contextItemInfo .encore-text-headline-small,
+html.terminal-full .main-nowPlayingView-contextItemInfo .encore-text-headline-large {
+  letter-spacing: 0 !important;
+}
+
+html.terminal-full .main-nowPlayingView-section,
+html.terminal-full .main-nowPlayingView-aboutArtist,
+html.terminal-full .main-nowPlayingView-artistOnTour,
+html.terminal-full .main-nowPlayingView-credits,
+html.terminal-full .main-nowPlayingView-nextInQueue {
+  background-color: var(--term-bg) !important;
+  border: 1px solid var(--term-border);
+  box-shadow: none !important;
+  transition: border-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full :is(.main-nowPlayingView-section, .main-nowPlayingView-aboutArtist, .main-nowPlayingView-artistOnTour, .main-nowPlayingView-credits, .main-nowPlayingView-nextInQueue):hover {
+  border-color: var(--term-green-dim);
+}
+
+/* Nested cards: only the outer one gets the frame. */
+html.terminal-full :is(.main-nowPlayingView-section, .main-nowPlayingView-aboutArtist, .main-nowPlayingView-artistOnTour, .main-nowPlayingView-credits, .main-nowPlayingView-nextInQueue) :is(.main-nowPlayingView-section, .main-nowPlayingView-aboutArtist, .main-nowPlayingView-artistOnTour, .main-nowPlayingView-credits, .main-nowPlayingView-nextInQueue) {
+  border: 0;
+}
+
+html.terminal-full .main-nowPlayingView-aboutArtist :is(img, [style*="background-image"]) {
+  filter: grayscale(0.35) contrast(1.05);
+}
+
+html.terminal-full .main-nowPlayingView-creditsGroup {
+  border-left: 1px solid var(--term-border);
+  padding-left: 10px !important;
+  transition: border-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .main-nowPlayingView-creditsGroup:hover {
+  border-left-color: var(--term-green);
+}
+
+html.terminal-full .main-nowPlayingView-onTourTimeCard {
+  border: 1px solid var(--term-border);
+  background: var(--term-bg-elevated) !important;
+}
+
+html.terminal-full .main-nowPlayingView-onTourTimeMonth {
+  color: var(--term-green) !important;
+  text-transform: uppercase;
+}
+
+/* ls-style rows: queue preview, queue panel, friend activity, devices. */
+html.terminal-full :is(.main-nowPlayingView-queueItem, .main-nowPlayingView-artistOnTourItem, .main-buddyFeed-friendActivity, .main-devicePicker-devicesList > li),
+html.terminal-full #Desktop_PanelContainer_Id [data-encore-id="listRow"] {
+  position: relative;
+  background-color: transparent !important;
+  box-shadow: inset 2px 0 0 0 transparent;
+  transition: background-color var(--tf-fast) var(--tf-ease), box-shadow var(--tf-fast) var(--tf-ease);
+  animation: tfp-row-in var(--tf-med) var(--tf-ease) both;
+}
+
+html.terminal-full :is(.main-nowPlayingView-queueItem, .main-nowPlayingView-artistOnTourItem, .main-buddyFeed-friendActivity, .main-devicePicker-devicesList > li):hover,
+html.terminal-full #Desktop_PanelContainer_Id [data-encore-id="listRow"]:hover {
+  background-color: var(--term-bg-hi) !important;
+  box-shadow: inset 2px 0 0 0 var(--term-green);
+}
+
+html.terminal-full :is(.main-nowPlayingView-queueItem, .main-nowPlayingView-artistOnTourItem, .main-buddyFeed-friendActivity, .main-devicePicker-devicesList > li, #Desktop_PanelContainer_Id [data-encore-id="listRow"]):nth-child(2) { animation-delay: 20ms; }
+html.terminal-full :is(.main-nowPlayingView-queueItem, .main-nowPlayingView-artistOnTourItem, .main-buddyFeed-friendActivity, .main-devicePicker-devicesList > li, #Desktop_PanelContainer_Id [data-encore-id="listRow"]):nth-child(3) { animation-delay: 40ms; }
+html.terminal-full :is(.main-nowPlayingView-queueItem, .main-nowPlayingView-artistOnTourItem, .main-buddyFeed-friendActivity, .main-devicePicker-devicesList > li, #Desktop_PanelContainer_Id [data-encore-id="listRow"]):nth-child(4) { animation-delay: 60ms; }
+html.terminal-full :is(.main-nowPlayingView-queueItem, .main-nowPlayingView-artistOnTourItem, .main-buddyFeed-friendActivity, .main-devicePicker-devicesList > li, #Desktop_PanelContainer_Id [data-encore-id="listRow"]):nth-child(5) { animation-delay: 80ms; }
+html.terminal-full :is(.main-nowPlayingView-queueItem, .main-nowPlayingView-artistOnTourItem, .main-buddyFeed-friendActivity, .main-devicePicker-devicesList > li, #Desktop_PanelContainer_Id [data-encore-id="listRow"]):nth-child(6) { animation-delay: 100ms; }
+html.terminal-full :is(.main-nowPlayingView-queueItem, .main-nowPlayingView-artistOnTourItem, .main-buddyFeed-friendActivity, .main-devicePicker-devicesList > li, #Desktop_PanelContainer_Id [data-encore-id="listRow"]):nth-child(7) { animation-delay: 120ms; }
+html.terminal-full :is(.main-nowPlayingView-queueItem, .main-nowPlayingView-artistOnTourItem, .main-buddyFeed-friendActivity, .main-devicePicker-devicesList > li, #Desktop_PanelContainer_Id [data-encore-id="listRow"]):nth-child(n+8) { animation-delay: 140ms; }
+
+@keyframes tfp-row-in {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: none; }
+}
+
+html.terminal-full #Desktop_PanelContainer_Id :is(img, .main-avatar-avatar, .main-avatar-image) {
+  border-radius: 0 !important;
+}
+
+html.terminal-full :is(.main-nowPlayingView-queueItemEntityImage, .main-buddyFeed-avatarContainer) {
+  outline: 1px solid var(--term-border);
+  outline-offset: 1px;
+}
+
+/* Encore pill buttons in the pane (Follow, Show all, Open queue…) become
+   square bordered text buttons, inverse on hover. */
+html.terminal-full #Desktop_PanelContainer_Id [data-encore-id="buttonSecondary"] {
+  border: 1px solid var(--term-border) !important;
+  box-shadow: none !important;
+  font-size: 12px;
+  transition: border-color var(--tf-fast) var(--tf-ease), color var(--tf-fast) var(--tf-ease), background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full #Desktop_PanelContainer_Id [data-encore-id="buttonSecondary"]:is(:hover, :focus-visible) {
+  border-color: var(--term-green) !important;
+  color: var(--term-green) !important;
+}
+
+/* Promos: merch shelf and Premium upsells. */
+html.terminal-full .main-nowPlayingView-merch,
+html.terminal-full #Desktop_PanelContainer_Id a[href*="spotify.com/premium"],
+html.terminal-full #Desktop_PanelContainer_Id [data-testid*="upsell" i] {
+  display: none !important;
+}
+
+/* Friend activity as a `who` listing: @user in green, dim timestamp and
+   dashed separators between rows. */
+html.terminal-full .main-buddyFeed-friendActivity {
+  border-bottom: 1px dashed var(--term-border);
+}
+
+html.terminal-full .main-buddyFeed-username a,
+html.terminal-full .main-buddyFeed-username {
+  color: var(--term-green) !important;
+}
+
+html.terminal-full .main-buddyFeed-username a::before {
+  content: "@";
+  color: var(--term-subdued);
+}
+
+html.terminal-full .main-buddyFeed-timestamp {
+  color: var(--term-subdued) !important;
+  font-size: 10px !important;
+  font-variant-numeric: tabular-nums;
+}
+
+html.terminal-full .main-buddyFeed-playbackContext {
+  color: var(--term-subdued) !important;
+}
+
+html.terminal-full .main-buddyFeed-playbackContext::before {
+  content: "└ ";
+  color: var(--term-border);
+}
+
+/* Connect devices: `aplay -l`-style list, current device in green. */
+html.terminal-full .main-devicePicker-devicesList > li {
+  border-bottom: 1px dashed var(--term-border);
+}
+
+html.terminal-full :is(.main-devicePicker-headingConnected, .main-devicePicker-connected) {
+  color: var(--term-green) !important;
+}
+
+html.terminal-full .main-devicePicker-headingConnected::before {
+  content: "▸ ";
+}
+
+html.terminal-full .main-devicePicker-troubleshooting {
+  border-top: 1px dashed var(--term-border);
+  color: var(--term-subdued) !important;
+}
+
+/* ---------- 3. Lyrics view (page, sidebar pane, cinema) ----------------
+   Spotify sets the lyrics colors inline from the cover art
+   (style="--lyrics-color-active: …" on the container). A rule that matches
+   the inline style itself beats it, the same technique the v1.2 cinema
+   rule above uses. Each line is prefixed "> ". The active line is green
+   with a blinking block caret, past lines are dimmed and upcoming lines
+   are subdued. Also covers the lyrics-plus custom app
+   (.lyrics-lyricsContainer-*). */
+html.terminal-full [style*="--lyrics-color"],
+html.terminal-full .lyrics-lyrics-container,
+html.terminal-full .main-nowPlayingView-section {
+  --lyrics-color-active: var(--term-green) !important;
+  --lyrics-color-inactive: var(--term-subdued) !important;
+  --lyrics-color-passed: var(--term-subdued) !important;
+  --lyrics-color-messaging: var(--term-subdued) !important;
+  --lyrics-color-background: var(--term-bg) !important;
+}
+
+html.terminal-full :is(.lyrics-lyrics-background, .lyrics-lyrics-container, .lyrics-lyrics-contentWrapper, .main-nowPlayingView-lyricsGradient, .Root__lyrics-cinema, .main-lyricsCinema-container, .lyrics-lyricsContainer-LyricsBackground) {
+  background-color: var(--term-bg) !important;
+  background-image: none !important;
+}
+
+html.terminal-full .main-nowPlayingView-lyricsContent {
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+}
+
+html.terminal-full :is(.lyrics-lyricsContent-lyric, .lyrics-lyricsContainer-LyricsLine) {
+  color: var(--term-subdued) !important;
+  letter-spacing: 0 !important;
+  font-weight: 600;
+  transition: color var(--tf-med) var(--tf-ease), opacity var(--tf-med) var(--tf-ease);
+}
+
+html.terminal-full :is(.lyrics-lyricsContent-lyric, .lyrics-lyricsContainer-LyricsLine):not(:empty)::before {
+  content: "> ";
+  color: var(--term-border);
+  white-space: pre;
+}
+
+html.terminal-full :is(.lyrics-lyricsContent-previous, .lyrics-lyricsContent-highlight, .lyrics-lyricsContainer-LyricsLine-past) {
+  opacity: 0.5;
+}
+
+html.terminal-full :is(.lyrics-lyricsContent-lyric.lyrics-lyricsContent-active, .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active) {
+  color: var(--term-green) !important;
+  opacity: 1;
+}
+
+html.terminal-full :is(.lyrics-lyricsContent-lyric.lyrics-lyricsContent-active, .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active)::before {
+  color: var(--term-green);
+}
+
+html.terminal-full :is(.lyrics-lyricsContent-lyric.lyrics-lyricsContent-active, .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active):not(:empty)::after {
+  content: "▋";
+  margin-left: 0.25em;
+  animation: term-blink 1s step-end infinite;
+}
+
+html.terminal-full :is(.lyrics-lyricsContent-provider, .lyrics-lyricsContainer-Provider) {
+  color: var(--term-subdued) !important;
+  font-size: 11px !important;
+}
+
+html.terminal-full :is(.lyrics-lyricsContent-provider, .lyrics-lyricsContainer-Provider)::before {
+  content: "# ";
+  color: var(--term-green);
+}
+
+/* ---------- 3b. Fullscreen / cinema view -------------------------------
+   Drop the blurred cover-art backdrop and the Spotify wordmark, square
+   the cover, frame the up-next card. The transport, seek bar and volume
+   already pick up the status line rules above through their data-testids,
+   and the bottom bar gets the same top rule and tinted background. */
+html.terminal-full :is(.Root__cinema-view, .npv-main-container) {
+  background: var(--term-bg) !important;
+}
+
+html.terminal-full :is(.npv-background-image, .npv-background-image__overlay, .npv-background-color, .npv-blur, .npv-lyrics__gradient-background) {
+  display: none !important;
+}
+
+html.terminal-full .npv-main-container :is(svg[aria-label="Spotify"], a[aria-label="Spotify"]) {
+  display: none !important;
+}
+
+html.terminal-full .npv-main-container *,
+html.terminal-full .npv-main-container *::before,
+html.terminal-full .npv-main-container *::after,
+html.terminal-full .Root__cinema-view *,
+html.terminal-full .Root__cinema-view *::before,
+html.terminal-full .Root__cinema-view *::after {
+  border-radius: 0 !important;
+}
+
+/* A 1px frame, so fullscreen reads as a maximized terminal window rather
+   than a poster. */
+html.terminal-full .npv-main-container {
+  box-shadow: inset 0 0 0 1px var(--term-border) !important;
+}
+
+html.terminal-full .npv-cover-art {
+  outline: 1px solid var(--term-border);
+  outline-offset: 4px;
+  box-shadow: none !important;
+}
+
+html.terminal-full .npv-track :is(a, span) {
+  letter-spacing: 0 !important;
+}
+
+html.terminal-full .npv-up-next {
+  background: var(--term-bg-elevated) !important;
+  border: 1px solid var(--term-border);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45) !important;
+}
+
+html.terminal-full .npv-up-next::before {
+  content: "# up next";
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: var(--term-green);
+}
+
+html.terminal-full :is(.npv-nowPlayingBar-container, .main-lyricsCinema-controls) {
+  background: var(--term-bg-tinted) !important;
+  border-top: 1px solid var(--term-border);
+}
+
+html.terminal-full .npv-exitFullScreenButton-button {
+  width: auto !important;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0 10px !important;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--term-subdued) !important;
+  background: transparent !important;
+  border: 1px solid var(--term-border) !important;
+  transition: color var(--tf-fast) var(--tf-ease), border-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .npv-exitFullScreenButton-button svg {
+  display: none !important;
+}
+
+html.terminal-full .npv-exitFullScreenButton-button::before {
+  content: "✕ exit";
+}
+
+html.terminal-full .npv-exitFullScreenButton-button:is(:hover, :focus-visible) {
+  color: var(--term-green) !important;
+  border-color: var(--term-green) !important;
+}
+
+/* Reduced motion: the global rule above already cuts every animation to
+   0.01ms. This also removes the row fade-in, the status line's breathing
+   and the lyrics caret blink outright, so nothing is left running. */
+@media (prefers-reduced-motion: reduce) {
+  html.terminal-full :is(.main-nowPlayingView-queueItem, .main-nowPlayingView-artistOnTourItem, .main-buddyFeed-friendActivity, .main-devicePicker-devicesList > li, #Desktop_PanelContainer_Id [data-encore-id="listRow"]),
+  html.terminal-full .Root__now-playing-bar::before,
+  html.terminal-full .main-nowPlayingWidget-coverArt::after,
+  html.terminal-full :is(.lyrics-lyricsContent-active, .lyrics-lyricsContainer-LyricsLine-active)::after {
+    animation: none !important;
+  }
+}
 /* --- END FULL/PLAYER ----------------------------------------------------- */
 
 /* --- FULL/PAGES (agent C) ------------------------------------------------ */
