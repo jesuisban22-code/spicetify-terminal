@@ -512,12 +512,15 @@
 		// applyPulseVisuals() — which the settings toggle also calls, so
 		// flipping the pulse at runtime takes effect on the current track.
 		function apply(uri) {
-			if (!uri) return;
-			var trackId = uri.split(":")[2];
+			// Set before anything else (and regardless of settings.pulse) so
+			// in-flight responses for the previous track see they're stale.
+			currentTrackUri = uri || null;
 			lastExtractedColor = null;
 			lastAudioFeatures = null;
 			resetTrackVisuals();
+			if (!uri) return; // nothing playing: CSS defaults, no markers
 
+			var trackId = uri.split(":")[2];
 			var cached = trackDataCache[uri];
 			if (cached) {
 				if (cached.color) lastExtractedColor = cached.color;
@@ -532,10 +535,11 @@
 				Spicetify.colorExtractor(uri)
 					.then(function (colors) {
 						var accent = (colors && (colors.VIBRANT || colors.PROMINENT || colors.LIGHT_VIBRANT)) || null;
-						if (accent) {
-							trackDataCache[uri].color = accent;
-							applyPulseVisuals();
-						}
+						if (!accent) return;
+						trackDataCache[uri].color = accent;
+						if (!isCurrentTrack(uri)) return; // skipped meanwhile: cache only
+						lastExtractedColor = accent;
+						applyPulseVisuals();
 					})
 					.catch(function () {
 						/* extraction can fail for local files/podcasts — keep the
@@ -550,8 +554,9 @@
 						"?format=json"
 				)
 					.then(function (data) {
-						lastAudioFeatures = data;
 						trackDataCache[uri].features = data;
+						if (!isCurrentTrack(uri)) return; // skipped meanwhile: cache only
+						lastAudioFeatures = data;
 						applyPulseVisuals();
 						renderTempoMarkers();
 					})
