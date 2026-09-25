@@ -178,6 +178,27 @@
 		}, 200);
 	}
 
+
+	// Runs fn after the next paint. Navigation handlers are deferred with
+	// this so a page change is drawn at native speed and the theme's
+	// decorations (titles, tags, ASCII pass, transitions) land one frame
+	// later — measured, doing them synchronously in the click task added
+	// ~180 ms to input-to-paint on a page change.
+	function afterPaint(fn) {
+		requestAnimationFrame(function () {
+			setTimeout(fn, 0);
+		});
+	}
+
+	// History.listen, with the callback moved after the next paint.
+	function tfListenHistory(cb) {
+		return Spicetify.Platform.History.listen(function (location) {
+			afterPaint(function () {
+				cb(location);
+			});
+		});
+	}
+
 	// ---------------------------------------------------------------------
 	// Platform detection — tags <html> with exactly one of
 	// terminal-os-windows / terminal-os-linux / terminal-os-mac so user.css
@@ -921,6 +942,11 @@
 				canvas.className = "terminal-ascii-art";
 				canvas.title = "click to toggle cover art";
 				container.style.position = container.style.position || "relative";
+				// Class-based clip instead of a `:has(> .terminal-ascii-art)`
+				// rule: a bare :has() subject is tested against every element
+				// on every style change, which showed up at the top of the
+				// selector cost profile.
+				container.classList.add("terminal-ascii-host");
 				container.appendChild(canvas);
 				canvas.addEventListener("click", function (e) {
 					e.stopPropagation();
@@ -990,7 +1016,7 @@
 		// "Vendredi = nouveautés") never got their first renderAll() pass
 		// and stayed as plain cover art forever.
 		Spicetify.Player.addEventListener("songchange", renderWithRetries);
-		Spicetify.Player.addEventListener("appchange", renderWithRetries);
+		Spicetify.Player.addEventListener("appchange", function () { afterPaint(renderWithRetries); });
 		// Spicetify.Platform.History can still be unready at this exact
 		// point even though Spicetify.Player already is (the two ready up
 		// independently) — a one-shot truthiness check here would then
@@ -998,7 +1024,7 @@
 		// until it's actually there.
 		waitFor(
 			function () { return Spicetify.Platform && Spicetify.Platform.History && Spicetify.Platform.History.listen; },
-			function () { Spicetify.Platform.History.listen(renderWithRetries); }
+			function () { tfListenHistory(renderWithRetries); }
 		);
 
 		// Belt-and-suspenders catch-all: shelf content on Home/Search often
@@ -1089,7 +1115,7 @@
 		waitFor(
 			function () { return Spicetify.Platform && Spicetify.Platform.History && Spicetify.Platform.History.listen; },
 			function () {
-				Spicetify.Platform.History.listen(function (location) {
+				tfListenHistory(function (location) {
 					onNavigate((location && location.pathname) || "");
 				});
 			}
@@ -1398,7 +1424,7 @@
 			function () {
 				// Torn down (or re-set-up) while we were still waiting.
 				if (!shellState.on || shellState.unlisten || shellState.keptListener) return;
-				var off = Spicetify.Platform.History.listen(function (location) {
+				var off = tfListenHistory(function (location) {
 					if (!shellState.on) return;
 					shellOnNavigate((location && location.pathname) || (location && location.location && location.location.pathname) || shellCurrentPath());
 				});
@@ -2022,7 +2048,7 @@
 				// didn't (older builds), the one listener stays but goes inert via
 				// tfPageTag.active, and is never stacked a second time.
 				if (!tfPageTag.listening) {
-					var un = H.listen(tfApplyPageTag);
+					var un = H.listen(function (location) { afterPaint(function () { tfApplyPageTag(location); }); });
 					tfPageTag.listening = true;
 					tfPageTag.unlisten = typeof un === "function" ? un : null;
 				}
@@ -2941,7 +2967,7 @@
 		// unready when this runs.
 		waitFor(
 			function () { return Spicetify.Platform && Spicetify.Platform.History && Spicetify.Platform.History.listen; },
-			function () { Spicetify.Platform.History.listen(clearVimCursor); }
+			function () { Spicetify.Platform.History.listen(clearVimCursor); } // cheap (one class), kept synchronous so Enter never hits a stale row
 		);
 
 		document.addEventListener("keydown", function (e) {

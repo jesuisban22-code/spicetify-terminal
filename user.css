@@ -246,7 +246,9 @@
 /* ---------- Respect reduced-motion globally, for every animation above and
    below (single source of truth, rather than re-checking per feature) ------ */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+*::before,
+*::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -413,7 +415,7 @@
 
 /* Clip the scaled pre to its container's bounds regardless of whether that
    container already had overflow:hidden of its own. */
-:has(> .terminal-ascii-art) {
+.terminal-ascii-host {
   overflow: hidden !important;
 }
 
@@ -571,7 +573,9 @@
 
 /* ---------- Smooth color transitions app-wide (additive; more specific
    Spotify rules still win, this only fills gaps where none exist) --------- */
-a, button, [role="button"] {
+a,
+button,
+[role="button"] {
   transition: color 150ms ease-out, background-color 150ms ease-out, border-color 150ms ease-out;
 }
 
@@ -1176,7 +1180,8 @@ html.terminal-full .Root__right-sidebar { animation-delay: 180ms; }
 }
 
 /* Inner surfaces that carried the panel's rounding and its own fill. */
-html.terminal-full :is(.Root__globalNav, .Root__nav-bar) :is(*, *::before, *::after),
+html.terminal-full .Root__globalNav *,
+html.terminal-full .Root__nav-bar *,
 html.terminal-full .Root__main-view > *,
 html.terminal-full .main-view-container,
 html.terminal-full .Root__right-sidebar > *,
@@ -1185,7 +1190,9 @@ html.terminal-full #Desktop_PanelContainer_Id {
   border-radius: 0 !important;
 }
 
-html.terminal-full .Root__nav-bar :is(.main-yourLibraryX-entryPoints, .main-yourLibraryX-library, .main-yourLibraryX-libraryContainer) {
+html.terminal-full .Root__nav-bar .main-yourLibraryX-entryPoints,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-library,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryContainer {
   background-color: var(--term-bg) !important;
   box-shadow: none !important;
 }
@@ -1292,10 +1299,13 @@ html.terminal-full .main-globalNav-historyButtons::before {
 
 /* Shared look for every top-bar icon button: a square, framed key. */
 html.terminal-full .main-globalNav-historyButtons > button,
-html.terminal-full :is([data-testid="top-bar-back-button"], [data-testid="top-bar-forward-button"]),
+html.terminal-full [data-testid="top-bar-back-button"],
+html.terminal-full [data-testid="top-bar-forward-button"],
 html.terminal-full :is(.main-globalNav-searchContainer > button, [data-testid="home-button"], .Root__globalNav .main-globalNav-navLink),
 html.terminal-full .main-globalNav-browseButtonWrapper button,
-html.terminal-full .Root__globalNav :is(.main-topBar-buddyFeed, .main-globalNav-buddyFeed, .main-topBar-whatsNewFeed),
+html.terminal-full .Root__globalNav .main-topBar-buddyFeed,
+html.terminal-full .Root__globalNav .main-globalNav-buddyFeed,
+html.terminal-full .Root__globalNav .main-topBar-whatsNewFeed,
 html.terminal-full .Root__globalNav [data-testid="user-widget-link"] {
   border-radius: 0 !important;
   border: 1px solid var(--term-border) !important;
@@ -1310,10 +1320,13 @@ html.terminal-full .Root__globalNav [data-testid="user-widget-link"] {
 }
 
 html.terminal-full .main-globalNav-historyButtons > button:hover:not(:disabled),
-html.terminal-full :is([data-testid="top-bar-back-button"], [data-testid="top-bar-forward-button"]):hover:not(:disabled),
+html.terminal-full [data-testid="top-bar-back-button"]:hover:not(:disabled),
+html.terminal-full [data-testid="top-bar-forward-button"]:hover:not(:disabled),
 html.terminal-full :is(.main-globalNav-searchContainer > button, [data-testid="home-button"], .Root__globalNav .main-globalNav-navLink):hover,
 html.terminal-full .main-globalNav-browseButtonWrapper button:hover,
-html.terminal-full .Root__globalNav :is(.main-topBar-buddyFeed, .main-globalNav-buddyFeed, .main-topBar-whatsNewFeed):hover,
+html.terminal-full .Root__globalNav .main-topBar-buddyFeed:hover,
+html.terminal-full .Root__globalNav .main-globalNav-buddyFeed:hover,
+html.terminal-full .Root__globalNav .main-topBar-whatsNewFeed:hover,
 html.terminal-full .Root__globalNav [data-testid="user-widget-link"]:hover {
   border-color: var(--term-green) !important;
   color: var(--term-green) !important;
@@ -1323,7 +1336,8 @@ html.terminal-full .Root__globalNav [data-testid="user-widget-link"]:hover {
    Spicetify Topbar buttons (ours included) are appended after them and
    keep their own icons. */
 html.terminal-full .main-globalNav-historyButtons > button:is(:nth-child(1), :nth-child(2)),
-html.terminal-full :is([data-testid="top-bar-back-button"], [data-testid="top-bar-forward-button"]) {
+html.terminal-full [data-testid="top-bar-back-button"],
+html.terminal-full [data-testid="top-bar-forward-button"] {
   width: 32px;
   height: 32px;
   padding: 0 !important;
@@ -1346,14 +1360,16 @@ html.terminal-full [data-testid="top-bar-forward-button"]::before {
   content: "›";
 }
 html.terminal-full .main-globalNav-historyButtons > button:is(:nth-child(1), :nth-child(2))::before,
-html.terminal-full :is([data-testid="top-bar-back-button"], [data-testid="top-bar-forward-button"])::before {
+html.terminal-full [data-testid="top-bar-back-button"]::before,
+html.terminal-full [data-testid="top-bar-forward-button"]::before {
   font-size: 20px;
   line-height: 1;
   margin-top: -2px;
 }
 
 html.terminal-full .main-globalNav-historyButtons > button:disabled,
-html.terminal-full :is([data-testid="top-bar-back-button"], [data-testid="top-bar-forward-button"]):disabled {
+html.terminal-full [data-testid="top-bar-back-button"]:disabled,
+html.terminal-full [data-testid="top-bar-forward-button"]:disabled {
   opacity: 0.35;
 }
 
@@ -1397,7 +1413,9 @@ html.terminal-full .main-globalNav-searchInputContainer:has(input) {
   position: relative;
 }
 
-html.terminal-full .Root__globalNav :is(input[data-testid="search-input"], .main-globalNav-searchInputText, input.main-topBar-searchBar) {
+html.terminal-full .Root__globalNav input[data-testid="search-input"],
+html.terminal-full .Root__globalNav .main-globalNav-searchInputText:not(tf-nx),
+html.terminal-full .Root__globalNav input.main-topBar-searchBar {
   border-radius: 0 !important;
   border: 1px solid var(--term-border) !important;
   background: var(--term-bg) !important;
@@ -1411,15 +1429,21 @@ html.terminal-full .Root__globalNav :is(input[data-testid="search-input"], .main
   transition: border-color var(--tf-fast) var(--tf-ease);
 }
 
-html.terminal-full .Root__globalNav :is(input[data-testid="search-input"], .main-globalNav-searchInputText, input.main-topBar-searchBar):hover {
+html.terminal-full .Root__globalNav input[data-testid="search-input"]:hover,
+html.terminal-full .Root__globalNav .main-globalNav-searchInputText:not(tf-nx):hover,
+html.terminal-full .Root__globalNav input.main-topBar-searchBar:hover {
   border-color: var(--term-subdued) !important;
 }
 
-html.terminal-full .Root__globalNav :is(input[data-testid="search-input"], .main-globalNav-searchInputText, input.main-topBar-searchBar):focus {
+html.terminal-full .Root__globalNav input[data-testid="search-input"]:focus,
+html.terminal-full .Root__globalNav .main-globalNav-searchInputText:not(tf-nx):focus,
+html.terminal-full .Root__globalNav input.main-topBar-searchBar:focus {
   border-color: var(--term-green) !important;
 }
 
-html.terminal-full .Root__globalNav :is(input[data-testid="search-input"], .main-globalNav-searchInputText, input.main-topBar-searchBar)::placeholder {
+html.terminal-full .Root__globalNav input[data-testid="search-input"]::placeholder,
+html.terminal-full .Root__globalNav .main-globalNav-searchInputText:not(tf-nx)::placeholder,
+html.terminal-full .Root__globalNav input.main-topBar-searchBar::placeholder {
   color: var(--term-subdued) !important;
   opacity: 1;
 }
@@ -1474,7 +1498,8 @@ html.terminal-full .main-globalNav-browseButtonWrapper {
   background: transparent !important;
 }
 
-html.terminal-full .main-globalNav-searchInputKBDWrapper :is(kbd, span) {
+html.terminal-full .main-globalNav-searchInputKBDWrapper kbd,
+html.terminal-full .main-globalNav-searchInputKBDWrapper span {
   border-radius: 0 !important;
   font-size: 10px !important;
   color: var(--term-subdued) !important;
@@ -1482,13 +1507,24 @@ html.terminal-full .main-globalNav-searchInputKBDWrapper :is(kbd, span) {
 
 /* Right cluster: upsells, install-app and any Spotify logo go; What's New
    and Friends become labelled keys; the avatar goes square. */
-html.terminal-full .Root__globalNav :is(.main-topBar-UpgradeButton, [data-testid="upgrade-button"], .upgrade-button, a[href*="spotify.com/premium"], a[href*="/premium"], a[href*="/download"], [data-testid="download-app-button"], [data-testid="install-app-button"], a[aria-label="Spotify"], [data-testid="spotify-logo"]),
+html.terminal-full .Root__globalNav .main-topBar-UpgradeButton:not(tf-nx),
+html.terminal-full .Root__globalNav [data-testid="upgrade-button"]:not(tf-nx),
+html.terminal-full .Root__globalNav .upgrade-button:not(tf-nx),
+html.terminal-full .Root__globalNav a[href*="spotify.com/premium"],
+html.terminal-full .Root__globalNav a[href*="/premium"],
+html.terminal-full .Root__globalNav a[href*="/download"],
+html.terminal-full .Root__globalNav [data-testid="download-app-button"]:not(tf-nx),
+html.terminal-full .Root__globalNav [data-testid="install-app-button"]:not(tf-nx),
+html.terminal-full .Root__globalNav a[aria-label="Spotify"],
+html.terminal-full .Root__globalNav [data-testid="spotify-logo"]:not(tf-nx),
 html.terminal-full .main-topBar-topbarContentRight > button:has(a[href*="/download"]),
 html.terminal-full .main-userWidget-setupPlan {
   display: none !important;
 }
 
-html.terminal-full .Root__globalNav :is(.main-topBar-buddyFeed, .main-globalNav-buddyFeed, .main-topBar-whatsNewFeed) {
+html.terminal-full .Root__globalNav .main-topBar-buddyFeed,
+html.terminal-full .Root__globalNav .main-globalNav-buddyFeed,
+html.terminal-full .Root__globalNav .main-topBar-whatsNewFeed {
   width: auto !important;
   height: 32px !important;
   padding: 0 8px !important;
@@ -1508,19 +1544,22 @@ html.terminal-full .Root__globalNav .main-topBar-whatsNewFeed::before {
   white-space: nowrap;
 }
 
-html.terminal-full .Root__globalNav :is(.main-topBar-buddyFeed, .main-globalNav-buddyFeed)::before {
+html.terminal-full .Root__globalNav .main-topBar-buddyFeed::before,
+html.terminal-full .Root__globalNav .main-globalNav-buddyFeed::before {
   content: "☺ amis";
   font-size: 12px;
   white-space: nowrap;
 }
 
-html.terminal-full .Root__globalNav :is(.main-topBar-buddyFeedActive, .main-topBar-whatsNewFeedActive) {
+html.terminal-full .Root__globalNav .main-topBar-buddyFeedActive,
+html.terminal-full .Root__globalNav .main-topBar-whatsNewFeedActive {
   color: var(--term-bg) !important;
   background: var(--term-green) !important;
   border-color: var(--term-green) !important;
 }
 
-html.terminal-full .Root__globalNav :is(.main-topBar-whatsNewFeedNotificationDot, .main-userWidget-notificationDot) {
+html.terminal-full .Root__globalNav .main-topBar-whatsNewFeedNotificationDot,
+html.terminal-full .Root__globalNav .main-userWidget-notificationDot {
   border-radius: 0 !important;
   background: var(--term-orange) !important;
   box-shadow: none !important;
@@ -1532,7 +1571,10 @@ html.terminal-full .Root__globalNav [data-testid="user-widget-link"] {
   height: 32px !important;
 }
 
-html.terminal-full .Root__globalNav :is(.main-avatar-avatar, .main-avatar-image, [data-testid="user-widget-link"] figure, [data-testid="user-widget-link"] img) {
+html.terminal-full .Root__globalNav .main-avatar-avatar:not(tf-nx),
+html.terminal-full .Root__globalNav .main-avatar-image:not(tf-nx),
+html.terminal-full .Root__globalNav [data-testid="user-widget-link"] figure,
+html.terminal-full .Root__globalNav [data-testid="user-widget-link"] img {
   border-radius: 0 !important;
   width: 26px !important;
   height: 26px !important;
@@ -1595,17 +1637,21 @@ html.terminal-full .main-yourLibraryX-collapseButton:hover {
   color: var(--term-green) !important;
 }
 
-html.terminal-full :is(.main-yourLibraryX-collapseButtonIsCollapsed, .main-yourLibraryX-libraryIsCollapsed .main-yourLibraryX-collapseButton)::after {
+html.terminal-full .main-yourLibraryX-collapseButtonIsCollapsed.main-yourLibraryX-collapseButtonIsCollapsed::after,
+html.terminal-full .main-yourLibraryX-libraryIsCollapsed .main-yourLibraryX-collapseButton::after {
   content: none;
 }
 
-html.terminal-full :is(.main-yourLibraryX-collapseButtonIsCollapsed, .main-yourLibraryX-libraryIsCollapsed .main-yourLibraryX-collapseButton) {
+html.terminal-full .main-yourLibraryX-collapseButtonIsCollapsed.main-yourLibraryX-collapseButtonIsCollapsed,
+html.terminal-full .main-yourLibraryX-libraryIsCollapsed .main-yourLibraryX-collapseButton {
   justify-content: center;
   min-width: 32px;
 }
 
 /* Create (+ Créer) and the other header keys */
-html.terminal-full .main-yourLibraryX-header :is(.main-yourLibraryX-createButton, .main-yourLibraryX-button, button[data-encore-id]) {
+html.terminal-full .main-yourLibraryX-header .main-yourLibraryX-createButton:not(tf-nx),
+html.terminal-full .main-yourLibraryX-header .main-yourLibraryX-button:not(tf-nx),
+html.terminal-full .main-yourLibraryX-header button[data-encore-id] {
   border-radius: 0 !important;
   border: 1px solid var(--term-border) !important;
   background: transparent !important;
@@ -1616,7 +1662,9 @@ html.terminal-full .main-yourLibraryX-header :is(.main-yourLibraryX-createButton
   transform: none !important;
 }
 
-html.terminal-full .main-yourLibraryX-header :is(.main-yourLibraryX-createButton, .main-yourLibraryX-button, button[data-encore-id]):hover {
+html.terminal-full .main-yourLibraryX-header .main-yourLibraryX-createButton:not(tf-nx):hover,
+html.terminal-full .main-yourLibraryX-header .main-yourLibraryX-button:not(tf-nx):hover,
+html.terminal-full .main-yourLibraryX-header button[data-encore-id]:hover {
   border-color: var(--term-green) !important;
   color: var(--term-green) !important;
 }
@@ -1683,7 +1731,9 @@ html.terminal-full .main-yourLibraryX-filterArea :is([aria-checked="true"], [ari
 }
 
 /* Sort + filter row */
-html.terminal-full .Root__nav-bar :is(.x-filterBox-expandButton, .x-sortBox-sortDropdown, .main-yourLibraryX-librarySortWrapper button) {
+html.terminal-full .Root__nav-bar .x-filterBox-expandButton:not(tf-nx),
+html.terminal-full .Root__nav-bar .x-sortBox-sortDropdown:not(tf-nx),
+html.terminal-full .Root__nav-bar .main-yourLibraryX-librarySortWrapper button {
   border-radius: 0 !important;
   min-height: 32px;
   min-width: 32px;
@@ -1692,7 +1742,9 @@ html.terminal-full .Root__nav-bar :is(.x-filterBox-expandButton, .x-sortBox-sort
   transform: none !important;
 }
 
-html.terminal-full .Root__nav-bar :is(.x-filterBox-expandButton, .x-sortBox-sortDropdown, .main-yourLibraryX-librarySortWrapper button):hover {
+html.terminal-full .Root__nav-bar .x-filterBox-expandButton:not(tf-nx):hover,
+html.terminal-full .Root__nav-bar .x-sortBox-sortDropdown:not(tf-nx):hover,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-librarySortWrapper button:hover {
   color: var(--term-green) !important;
 }
 
@@ -1706,7 +1758,8 @@ html.terminal-full .Root__nav-bar .x-filterBox-expandButton::before {
   line-height: 1;
 }
 
-html.terminal-full .Root__nav-bar :is(.x-sortBox-sortDropdown, .main-yourLibraryX-librarySortWrapper button) {
+html.terminal-full .Root__nav-bar .x-sortBox-sortDropdown:not(tf-nx),
+html.terminal-full .Root__nav-bar .main-yourLibraryX-librarySortWrapper button {
   font-size: 12px !important;
   gap: 6px;
 }
@@ -1770,7 +1823,9 @@ html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist .main-yourL
 }
 
 /* └ on the last row */
-html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist :is(.main-yourLibraryX-listItem:last-child, [role="row"]:last-child > .main-yourLibraryX-listItem, [role="row"]:last-child .main-yourLibraryX-listItem):not(:has([data-encore-id="card"]))::before {
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist .main-yourLibraryX-listItem:last-child.main-yourLibraryX-listItem:not(:has([data-encore-id="card"]))::before,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist [role="row"]:last-child > .main-yourLibraryX-listItem:not(:has([data-encore-id="card"]))::before,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist [role="row"]:last-child .main-yourLibraryX-listItem:not(:has([data-encore-id="card"]))::before {
   bottom: 50%;
 }
 
@@ -1780,31 +1835,38 @@ html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist .main-yourL
   opacity: 1;
 }
 
-html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem :is([data-encore-id="listRow"], .main-yourLibraryX-listItemGroup) {
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem [data-encore-id="listRow"],
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem .main-yourLibraryX-listItemGroup {
   border-radius: 0 !important;
   padding-block: 4px !important;
   transition: background-color var(--tf-fast) var(--tf-ease);
 }
 
-html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem :is([data-encore-id="listRow"], .main-yourLibraryX-listItemGroup):hover {
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem [data-encore-id="listRow"]:hover,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem .main-yourLibraryX-listItemGroup:hover {
   background-color: var(--term-bg-hi) !important;
 }
 
-html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem :is([aria-selected="true"], [aria-current="page"], [data-context-menu-open="true"]) {
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem [aria-selected="true"],
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem [aria-current="page"],
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem [data-context-menu-open="true"] {
   background-color: var(--term-bg-hi) !important;
   box-shadow: inset 2px 0 0 var(--term-green) !important;
 }
 
-html.terminal-full .Root__nav-bar :is(.main-yourLibraryX-listRowTitleLink, [data-encore-id="listRowTitle"]) {
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listRowTitleLink,
+html.terminal-full .Root__nav-bar [data-encore-id="listRowTitle"] {
   font-size: 13px !important;
   font-weight: 400 !important;
 }
 
-html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem:hover :is(.main-yourLibraryX-listRowTitleLink, [data-encore-id="listRowTitle"]) {
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem:hover .main-yourLibraryX-listRowTitleLink,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listItem:hover [data-encore-id="listRowTitle"] {
   color: var(--term-green) !important;
 }
 
-html.terminal-full .Root__nav-bar :is(.main-yourLibraryX-listRowSubtitle, [data-encore-id="listRowSubtitle"]) {
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listRowSubtitle,
+html.terminal-full .Root__nav-bar [data-encore-id="listRowSubtitle"] {
   font-size: 11px !important;
   color: var(--term-subdued) !important;
 }
@@ -1816,13 +1878,16 @@ html.terminal-full .Root__nav-bar :is(.main-yourLibraryX-listRowSubtitle, [data-
 }
 
 /* Covers: square, framed, a size down (list mode). */
-html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist .main-yourLibraryX-listItem:not(:has([data-encore-id="card"])) :is(.main-yourLibraryX-rowCover, .main-yourLibraryX-listRowEntityImage) {
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist .main-yourLibraryX-listItem:not(:has([data-encore-id="card"])) .main-yourLibraryX-rowCover,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryRootlist .main-yourLibraryX-listItem:not(:has([data-encore-id="card"])) .main-yourLibraryX-listRowEntityImage {
   width: 36px !important;
   height: 36px !important;
   min-width: 36px !important;
 }
 
-html.terminal-full .Root__nav-bar :is(.main-yourLibraryX-rowCover, .main-yourLibraryX-listRowEntityImage, .x-entityImage-imageContainer) {
+html.terminal-full .Root__nav-bar .main-yourLibraryX-rowCover,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-listRowEntityImage,
+html.terminal-full .Root__nav-bar .x-entityImage-imageContainer {
   outline: 1px solid var(--term-border);
   outline-offset: -1px;
 }
@@ -1837,7 +1902,8 @@ html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryIsCollapsed .main-yo
   content: none !important;
 }
 
-html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryIsCollapsed :is(.main-yourLibraryX-rowCover, .main-yourLibraryX-listRowEntityImage) {
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryIsCollapsed .main-yourLibraryX-rowCover,
+html.terminal-full .Root__nav-bar .main-yourLibraryX-libraryIsCollapsed .main-yourLibraryX-listRowEntityImage {
   width: 40px !important;
   height: 40px !important;
 }
@@ -1857,13 +1923,13 @@ html.terminal-full .Root__nav-bar [data-encore-id="card"]:hover {
 /* ---------- 4. Reduced motion: none of the above moves ---------------- */
 @media (prefers-reduced-motion: reduce) {
   html.terminal-full .Root__globalNav,
-  html.terminal-full .Root__nav-bar,
-  html.terminal-full .Root__main-view,
-  html.terminal-full .Root__right-sidebar,
-  html.terminal-full .Root__nav-bar::before,
-  html.terminal-full .Root__main-view::before,
-  html.terminal-full .Root__right-sidebar::before,
-  html.terminal-full .main-globalNav-searchInputContainer::after {
+html.terminal-full .Root__nav-bar,
+html.terminal-full .Root__main-view,
+html.terminal-full .Root__right-sidebar,
+html.terminal-full .Root__nav-bar::before,
+html.terminal-full .Root__main-view::before,
+html.terminal-full .Root__right-sidebar::before,
+html.terminal-full .main-globalNav-searchInputContainer::after {
     animation: none !important;
   }
 }
@@ -1962,9 +2028,7 @@ html.terminal-full .Root__now-playing-bar::before {
   50% { opacity: 0.9; }
 }
 
-html.terminal-full .Root__now-playing-bar *,
-html.terminal-full .Root__now-playing-bar *::before,
-html.terminal-full .Root__now-playing-bar *::after {
+html.terminal-full .Root__now-playing-bar * {
   border-radius: 0 !important;
 }
 
@@ -2173,16 +2237,14 @@ html.terminal-full .player-controls__right {
   gap: 4px !important;
 }
 
-html.terminal-full :is(
-  [data-testid="control-button-shuffle"],
-  [data-testid="control-button-skip-back"],
-  [data-testid="control-button-skip-forward"],
-  [data-testid="control-button-repeat"],
-  [data-testid="control-button-seek-back-15"],
-  [data-testid="control-button-seek-forward-15"],
-  [data-testid="control-button-sleep-timer"],
-  [data-testid="control-button-npv-episodes"]
-) {
+html.terminal-full [data-testid="control-button-shuffle"],
+html.terminal-full [data-testid="control-button-skip-back"],
+html.terminal-full [data-testid="control-button-skip-forward"],
+html.terminal-full [data-testid="control-button-repeat"],
+html.terminal-full [data-testid="control-button-seek-back-15"],
+html.terminal-full [data-testid="control-button-seek-forward-15"],
+html.terminal-full [data-testid="control-button-sleep-timer"],
+html.terminal-full [data-testid="control-button-npv-episodes"] {
   position: relative;
   min-width: 32px !important;
   width: auto !important;
@@ -2228,16 +2290,14 @@ html.terminal-full :is(
   display: none !important;
 }
 
-html.terminal-full :is(
-  [data-testid="control-button-shuffle"],
-  [data-testid="control-button-skip-back"],
-  [data-testid="control-button-skip-forward"],
-  [data-testid="control-button-repeat"],
-  [data-testid="control-button-seek-back-15"],
-  [data-testid="control-button-seek-forward-15"],
-  [data-testid="control-button-sleep-timer"],
-  [data-testid="control-button-npv-episodes"]
-)::before {
+html.terminal-full [data-testid="control-button-shuffle"]::before,
+html.terminal-full [data-testid="control-button-skip-back"]::before,
+html.terminal-full [data-testid="control-button-skip-forward"]::before,
+html.terminal-full [data-testid="control-button-repeat"]::before,
+html.terminal-full [data-testid="control-button-seek-back-15"]::before,
+html.terminal-full [data-testid="control-button-seek-forward-15"]::before,
+html.terminal-full [data-testid="control-button-sleep-timer"]::before,
+html.terminal-full [data-testid="control-button-npv-episodes"]::before {
   content: var(--tfp-glyph);
   position: static;
   font-size: inherit;
@@ -2247,16 +2307,14 @@ html.terminal-full :is(
 /* ::after is Spotify's green "active" dot on these buttons. It is taken
    over for the hover underline sweep, and active state is shown as inverse
    video instead of the dot. */
-html.terminal-full :is(
-  [data-testid="control-button-shuffle"],
-  [data-testid="control-button-skip-back"],
-  [data-testid="control-button-skip-forward"],
-  [data-testid="control-button-repeat"],
-  [data-testid="control-button-seek-back-15"],
-  [data-testid="control-button-seek-forward-15"],
-  [data-testid="control-button-sleep-timer"],
-  [data-testid="control-button-npv-episodes"]
-)::after {
+html.terminal-full [data-testid="control-button-shuffle"]::after,
+html.terminal-full [data-testid="control-button-skip-back"]::after,
+html.terminal-full [data-testid="control-button-skip-forward"]::after,
+html.terminal-full [data-testid="control-button-repeat"]::after,
+html.terminal-full [data-testid="control-button-seek-back-15"]::after,
+html.terminal-full [data-testid="control-button-seek-forward-15"]::after,
+html.terminal-full [data-testid="control-button-sleep-timer"]::after,
+html.terminal-full [data-testid="control-button-npv-episodes"]::after {
   content: "" !important;
   display: block !important;
   position: absolute !important;
@@ -2271,45 +2329,40 @@ html.terminal-full :is(
   transition: transform var(--tf-med) var(--tf-ease);
 }
 
-html.terminal-full :is(
-  [data-testid="control-button-shuffle"],
-  [data-testid="control-button-skip-back"],
-  [data-testid="control-button-skip-forward"],
-  [data-testid="control-button-repeat"],
-  [data-testid="control-button-seek-back-15"],
-  [data-testid="control-button-seek-forward-15"],
-  [data-testid="control-button-sleep-timer"],
-  [data-testid="control-button-npv-episodes"]
-):is(:hover, :focus-visible) {
+html.terminal-full [data-testid="control-button-shuffle"]:is(:hover, :focus-visible),
+html.terminal-full [data-testid="control-button-skip-back"]:is(:hover, :focus-visible),
+html.terminal-full [data-testid="control-button-skip-forward"]:is(:hover, :focus-visible),
+html.terminal-full [data-testid="control-button-repeat"]:is(:hover, :focus-visible),
+html.terminal-full [data-testid="control-button-seek-back-15"]:is(:hover, :focus-visible),
+html.terminal-full [data-testid="control-button-seek-forward-15"]:is(:hover, :focus-visible),
+html.terminal-full [data-testid="control-button-sleep-timer"]:is(:hover, :focus-visible),
+html.terminal-full [data-testid="control-button-npv-episodes"]:is(:hover, :focus-visible) {
   color: var(--term-text) !important;
   background-color: var(--term-bg-hi) !important;
 }
 
-html.terminal-full :is(
-  [data-testid="control-button-shuffle"],
-  [data-testid="control-button-skip-back"],
-  [data-testid="control-button-skip-forward"],
-  [data-testid="control-button-repeat"],
-  [data-testid="control-button-seek-back-15"],
-  [data-testid="control-button-seek-forward-15"],
-  [data-testid="control-button-sleep-timer"],
-  [data-testid="control-button-npv-episodes"]
-):is(:hover, :focus-visible)::after {
+html.terminal-full [data-testid="control-button-shuffle"]:is(:hover, :focus-visible)::after,
+html.terminal-full [data-testid="control-button-skip-back"]:is(:hover, :focus-visible)::after,
+html.terminal-full [data-testid="control-button-skip-forward"]:is(:hover, :focus-visible)::after,
+html.terminal-full [data-testid="control-button-repeat"]:is(:hover, :focus-visible)::after,
+html.terminal-full [data-testid="control-button-seek-back-15"]:is(:hover, :focus-visible)::after,
+html.terminal-full [data-testid="control-button-seek-forward-15"]:is(:hover, :focus-visible)::after,
+html.terminal-full [data-testid="control-button-sleep-timer"]:is(:hover, :focus-visible)::after,
+html.terminal-full [data-testid="control-button-npv-episodes"]:is(:hover, :focus-visible)::after {
   transform: scaleX(1) !important;
 }
 
-html.terminal-full :is(
-  [data-testid="control-button-shuffle"],
-  [data-testid="control-button-skip-back"],
-  [data-testid="control-button-skip-forward"],
-  [data-testid="control-button-repeat"]
-):active {
+html.terminal-full [data-testid="control-button-shuffle"]:active,
+html.terminal-full [data-testid="control-button-skip-back"]:active,
+html.terminal-full [data-testid="control-button-skip-forward"]:active,
+html.terminal-full [data-testid="control-button-repeat"]:active {
   transform: translateY(1px) !important;
 }
 
 /* Active shuffle / repeat: inverse video (green block, dark glyph), the
    way a terminal shows a selected item. */
-html.terminal-full :is([data-testid="control-button-shuffle"], [data-testid="control-button-repeat"]):is([aria-checked="true"], [aria-checked="mixed"], .control-button--active, .main-shuffleButton-active, .main-repeatButton-active),
+html.terminal-full [data-testid="control-button-shuffle"]:is([aria-checked="true"], [aria-checked="mixed"], .control-button--active, .main-shuffleButton-active, .main-repeatButton-active),
+html.terminal-full [data-testid="control-button-repeat"]:is([aria-checked="true"], [aria-checked="mixed"], .control-button--active, .main-shuffleButton-active, .main-repeatButton-active),
 html.terminal-full [data-tf-shuffle="1"] [data-testid="control-button-shuffle"],
 html.terminal-full:is([data-tf-repeat="1"], [data-tf-repeat="2"]) [data-testid="control-button-repeat"] {
   color: var(--term-bg) !important;
@@ -2317,7 +2370,8 @@ html.terminal-full:is([data-tf-repeat="1"], [data-tf-repeat="2"]) [data-testid="
   border-color: var(--term-green) !important;
 }
 
-html.terminal-full :is([data-testid="control-button-shuffle"], [data-testid="control-button-repeat"]):is([aria-checked="true"], [aria-checked="mixed"], .control-button--active, .main-shuffleButton-active, .main-repeatButton-active)::after,
+html.terminal-full [data-testid="control-button-shuffle"]:is([aria-checked="true"], [aria-checked="mixed"], .control-button--active, .main-shuffleButton-active, .main-repeatButton-active)::after,
+html.terminal-full [data-testid="control-button-repeat"]:is([aria-checked="true"], [aria-checked="mixed"], .control-button--active, .main-shuffleButton-active, .main-repeatButton-active)::after,
 html.terminal-full [data-tf-shuffle="1"] [data-testid="control-button-shuffle"]::after,
 html.terminal-full:is([data-tf-repeat="1"], [data-tf-repeat="2"]) [data-testid="control-button-repeat"]::after {
   background: var(--term-bg) !important;
@@ -2412,7 +2466,8 @@ html.terminal-full .playback-bar {
   font-size: 11px;
 }
 
-html.terminal-full .playback-bar :is(.playback-bar__progress-time-elapsed, [data-testid="playback-position"]) {
+html.terminal-full .playback-bar .playback-bar__progress-time-elapsed,
+html.terminal-full .playback-bar [data-testid="playback-position"] {
   order: 2;
   min-width: 0 !important;
   margin-left: 18px;
@@ -2422,7 +2477,8 @@ html.terminal-full .playback-bar :is(.playback-bar__progress-time-elapsed, [data
   font-variant-numeric: tabular-nums;
 }
 
-html.terminal-full .playback-bar :is(.main-playbackBarRemainingTime-container, [data-testid="playback-duration"]) {
+html.terminal-full .playback-bar .main-playbackBarRemainingTime-container,
+html.terminal-full .playback-bar [data-testid="playback-duration"] {
   order: 3;
   min-width: 0 !important;
   text-align: left;
@@ -2431,7 +2487,8 @@ html.terminal-full .playback-bar :is(.main-playbackBarRemainingTime-container, [
   font-variant-numeric: tabular-nums;
 }
 
-html.terminal-full .playback-bar :is(.main-playbackBarRemainingTime-container, [data-testid="playback-duration"])::before {
+html.terminal-full .playback-bar .main-playbackBarRemainingTime-container::before,
+html.terminal-full .playback-bar [data-testid="playback-duration"]::before {
   content: "/";
   color: var(--term-subdued);
   margin: 0 2px;
@@ -2458,7 +2515,9 @@ html.terminal-full .playback-bar [data-testid="progress-bar"]::after {
 html.terminal-full .playback-bar [data-testid="progress-bar"]::before { content: "["; left: -11px; }
 html.terminal-full .playback-bar [data-testid="progress-bar"]::after { content: "]"; right: -11px; }
 
-html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) :is([data-testid="progress-bar-background"], .x-progressBar-progressBarBg, .x-progressBar-background) {
+html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) [data-testid="progress-bar-background"],
+html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) .x-progressBar-progressBarBg,
+html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) .x-progressBar-background {
   height: 10px !important;
   border-radius: 0 !important;
   background-color: var(--term-border) !important;
@@ -2467,12 +2526,16 @@ html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) :is([data-test
   transition: background-color var(--tf-fast) var(--tf-ease);
 }
 
-html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) :is(.x-progressBar-fillColor, .x-progressBar-foreground, .x-progressBar-progressFillColor) {
+html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) .x-progressBar-fillColor,
+html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) .x-progressBar-foreground,
+html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) .x-progressBar-progressFillColor {
   background-color: var(--term-green) !important;
   border-radius: 0 !important;
 }
 
-html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) [data-testid="progress-bar"]:hover :is([data-testid="progress-bar-background"], .x-progressBar-progressBarBg, .x-progressBar-background) {
+html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) [data-testid="progress-bar"]:hover [data-testid="progress-bar-background"],
+html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) [data-testid="progress-bar"]:hover .x-progressBar-progressBarBg,
+html.terminal-full :is(.playback-bar, [data-testid="volume-bar"]) [data-testid="progress-bar"]:hover .x-progressBar-background {
   background-color: var(--term-subdued) !important;
 }
 
@@ -2518,18 +2581,18 @@ html.terminal-full .main-nowPlayingBar-extraControls button:is(:hover, :focus-vi
 html.terminal-full [data-testid="control-button-npv"] { --tfp-glyph: "▣"; --tfp-label: "now"; }
 html.terminal-full [data-testid="lyrics-button"] { --tfp-glyph: "¶"; --tfp-label: "lyrics"; }
 html.terminal-full [data-testid="control-button-queue"] { --tfp-glyph: "≡"; --tfp-label: "queue"; }
-html.terminal-full .main-nowPlayingBar-extraControls :is(.main-devicePicker-controlButton, button[aria-describedby*="connect"]) { --tfp-glyph: "⇆"; --tfp-label: "device"; }
+html.terminal-full .main-nowPlayingBar-extraControls .main-devicePicker-controlButton:not(tf-nx),
+html.terminal-full .main-nowPlayingBar-extraControls button[aria-describedby*="connect"] { --tfp-glyph: "⇆"; --tfp-label: "device"; }
 html.terminal-full [data-testid="pip-toggle-button"] { --tfp-glyph: "⧉"; --tfp-label: "mini"; }
 html.terminal-full [data-testid="fullscreen-mode-button"] { --tfp-glyph: "⤢"; --tfp-label: "full"; }
 
-html.terminal-full :is(
-  [data-testid="control-button-npv"],
-  [data-testid="lyrics-button"],
-  [data-testid="control-button-queue"],
-  [data-testid="pip-toggle-button"],
-  [data-testid="fullscreen-mode-button"]
-),
-html.terminal-full .main-nowPlayingBar-extraControls :is(.main-devicePicker-controlButton, button[aria-describedby*="connect"]) {
+html.terminal-full [data-testid="control-button-npv"],
+html.terminal-full [data-testid="lyrics-button"],
+html.terminal-full [data-testid="control-button-queue"],
+html.terminal-full [data-testid="pip-toggle-button"],
+html.terminal-full [data-testid="fullscreen-mode-button"],
+html.terminal-full .main-nowPlayingBar-extraControls .main-devicePicker-controlButton:not(tf-nx),
+html.terminal-full .main-nowPlayingBar-extraControls button[aria-describedby*="connect"] {
   position: relative;
   width: auto !important;
   min-width: 40px !important;
@@ -2554,14 +2617,13 @@ html.terminal-full .main-nowPlayingBar-extraControls :is(.main-devicePicker-cont
   display: none !important;
 }
 
-html.terminal-full :is(
-  [data-testid="control-button-npv"],
-  [data-testid="lyrics-button"],
-  [data-testid="control-button-queue"],
-  [data-testid="pip-toggle-button"],
-  [data-testid="fullscreen-mode-button"]
-)::before,
-html.terminal-full .main-nowPlayingBar-extraControls :is(.main-devicePicker-controlButton, button[aria-describedby*="connect"])::before {
+html.terminal-full [data-testid="control-button-npv"]::before,
+html.terminal-full [data-testid="lyrics-button"]::before,
+html.terminal-full [data-testid="control-button-queue"]::before,
+html.terminal-full [data-testid="pip-toggle-button"]::before,
+html.terminal-full [data-testid="fullscreen-mode-button"]::before,
+html.terminal-full .main-nowPlayingBar-extraControls .main-devicePicker-controlButton:not(tf-nx)::before,
+html.terminal-full .main-nowPlayingBar-extraControls button[aria-describedby*="connect"]::before {
   content: var(--tfp-glyph);
   position: static;
   font-size: 15px;
@@ -2569,14 +2631,13 @@ html.terminal-full .main-nowPlayingBar-extraControls :is(.main-devicePicker-cont
 }
 
 /* ::after is the label, which also takes over Spotify's active dot. */
-html.terminal-full :is(
-  [data-testid="control-button-npv"],
-  [data-testid="lyrics-button"],
-  [data-testid="control-button-queue"],
-  [data-testid="pip-toggle-button"],
-  [data-testid="fullscreen-mode-button"]
-)::after,
-html.terminal-full .main-nowPlayingBar-extraControls :is(.main-devicePicker-controlButton, button[aria-describedby*="connect"])::after {
+html.terminal-full [data-testid="control-button-npv"]::after,
+html.terminal-full [data-testid="lyrics-button"]::after,
+html.terminal-full [data-testid="control-button-queue"]::after,
+html.terminal-full [data-testid="pip-toggle-button"]::after,
+html.terminal-full [data-testid="fullscreen-mode-button"]::after,
+html.terminal-full .main-nowPlayingBar-extraControls .main-devicePicker-controlButton:not(tf-nx)::after,
+html.terminal-full .main-nowPlayingBar-extraControls button[aria-describedby*="connect"]::after {
   content: var(--tfp-label) !important;
   display: block !important;
   position: static !important;
@@ -2592,14 +2653,13 @@ html.terminal-full .main-nowPlayingBar-extraControls :is(.main-devicePicker-cont
 }
 
 /* Open panel / active view: inverse video instead of the green dot. */
-html.terminal-full :is(
-  [data-testid="control-button-npv"],
-  [data-testid="lyrics-button"],
-  [data-testid="control-button-queue"],
-  [data-testid="pip-toggle-button"],
-  [data-testid="fullscreen-mode-button"]
-):is([data-active="true"], [aria-pressed="true"], .control-button--active),
-html.terminal-full .main-nowPlayingBar-extraControls :is(.main-devicePicker-controlButton, button[aria-describedby*="connect"]):is([data-active="true"], [aria-pressed="true"], [aria-expanded="true"], .control-button--active, .main-devicePicker-connected) {
+html.terminal-full [data-testid="control-button-npv"]:is([data-active="true"], [aria-pressed="true"], .control-button--active),
+html.terminal-full [data-testid="lyrics-button"]:is([data-active="true"], [aria-pressed="true"], .control-button--active),
+html.terminal-full [data-testid="control-button-queue"]:is([data-active="true"], [aria-pressed="true"], .control-button--active),
+html.terminal-full [data-testid="pip-toggle-button"]:is([data-active="true"], [aria-pressed="true"], .control-button--active),
+html.terminal-full [data-testid="fullscreen-mode-button"]:is([data-active="true"], [aria-pressed="true"], .control-button--active),
+html.terminal-full .main-nowPlayingBar-extraControls .main-devicePicker-controlButton:not(tf-nx):is([data-active="true"], [aria-pressed="true"], [aria-expanded="true"], .control-button--active, .main-devicePicker-connected),
+html.terminal-full .main-nowPlayingBar-extraControls button[aria-describedby*="connect"]:is([data-active="true"], [aria-pressed="true"], [aria-expanded="true"], .control-button--active, .main-devicePicker-connected) {
   color: var(--term-bg) !important;
   background-color: var(--term-green) !important;
   border-color: var(--term-green) !important;
@@ -2643,7 +2703,9 @@ html.terminal-full [data-testid="volume-bar-toggle-mute-button"]:is(:hover, :foc
   border-color: var(--term-border) !important;
 }
 
-html.terminal-full [data-testid="volume-bar"] :is([data-testid="progress-bar-background"], .x-progressBar-progressBarBg, .x-progressBar-background) {
+html.terminal-full [data-testid="volume-bar"] [data-testid="progress-bar-background"],
+html.terminal-full [data-testid="volume-bar"] .x-progressBar-progressBarBg,
+html.terminal-full [data-testid="volume-bar"] .x-progressBar-background {
   -webkit-mask-image: repeating-linear-gradient(90deg, var(--term-bg) 0 8px, transparent 8px 11px);
   mask-image: repeating-linear-gradient(90deg, var(--term-bg) 0 8px, transparent 8px 11px);
 }
@@ -2661,7 +2723,8 @@ html.terminal-full .main-connectBar-connectBar {
   font-size: 11px;
 }
 
-html.terminal-full .main-connectBar-connectBar :is(svg, path) {
+html.terminal-full .main-connectBar-connectBar svg,
+html.terminal-full .main-connectBar-connectBar path {
   fill: var(--term-green) !important;
   color: var(--term-green) !important;
 }
@@ -2674,25 +2737,23 @@ html.terminal-full .main-connectBar-connectBar::before {
 /* Narrow windows: drop the text labels and the mode tag. The buttons keep
    their glyph and Spotify's own tooltip, so they stay identifiable. */
 @media (max-width: 1100px) {
-  html.terminal-full :is(
-    [data-testid="control-button-npv"],
-    [data-testid="lyrics-button"],
-    [data-testid="control-button-queue"],
-    [data-testid="pip-toggle-button"],
-    [data-testid="fullscreen-mode-button"]
-  )::after,
-  html.terminal-full .main-nowPlayingBar-extraControls :is(.main-devicePicker-controlButton, button[aria-describedby*="connect"])::after {
+  html.terminal-full [data-testid="control-button-npv"]::after,
+html.terminal-full [data-testid="lyrics-button"]::after,
+html.terminal-full [data-testid="control-button-queue"]::after,
+html.terminal-full [data-testid="pip-toggle-button"]::after,
+html.terminal-full [data-testid="fullscreen-mode-button"]::after,
+html.terminal-full .main-nowPlayingBar-extraControls .main-devicePicker-controlButton:not(tf-nx)::after,
+html.terminal-full .main-nowPlayingBar-extraControls button[aria-describedby*="connect"]::after {
     display: none !important;
   }
 
-  html.terminal-full :is(
-    [data-testid="control-button-npv"],
-    [data-testid="lyrics-button"],
-    [data-testid="control-button-queue"],
-    [data-testid="pip-toggle-button"],
-    [data-testid="fullscreen-mode-button"]
-  ),
-  html.terminal-full .main-nowPlayingBar-extraControls :is(.main-devicePicker-controlButton, button[aria-describedby*="connect"]) {
+  html.terminal-full [data-testid="control-button-npv"],
+html.terminal-full [data-testid="lyrics-button"],
+html.terminal-full [data-testid="control-button-queue"],
+html.terminal-full [data-testid="pip-toggle-button"],
+html.terminal-full [data-testid="fullscreen-mode-button"],
+html.terminal-full .main-nowPlayingBar-extraControls .main-devicePicker-controlButton:not(tf-nx),
+html.terminal-full .main-nowPlayingBar-extraControls button[aria-describedby*="connect"] {
     min-width: 32px !important;
     height: 32px !important;
   }
@@ -2714,7 +2775,8 @@ html.terminal-full .main-connectBar-connectBar::before {
     padding-left: 6px;
   }
 
-  html.terminal-full .playback-bar :is(.playback-bar__progress-time-elapsed, [data-testid="playback-position"]) {
+  html.terminal-full .playback-bar .playback-bar__progress-time-elapsed,
+html.terminal-full .playback-bar [data-testid="playback-position"] {
     margin-left: 14px;
   }
 
@@ -2732,32 +2794,35 @@ html.terminal-full .main-connectBar-connectBar::before {
    in aside#Desktop_PanelContainer_Id. Headings get a "# " prefix, lists
    become ls-style rows, and cards are square boxes with 1px borders. Merch
    is hidden, and so are Premium upsell links. */
-html.terminal-full #Desktop_PanelContainer_Id *,
-html.terminal-full #Desktop_PanelContainer_Id *::before,
-html.terminal-full #Desktop_PanelContainer_Id *::after {
+html.terminal-full #Desktop_PanelContainer_Id * {
   border-radius: 0 !important;
 }
 
-html.terminal-full #Desktop_PanelContainer_Id :is(.main-nowPlayingView-gradient, .main-nowPlayingView-content, .main-buddyFeed-container) {
+html.terminal-full #Desktop_PanelContainer_Id .main-nowPlayingView-gradient,
+html.terminal-full #Desktop_PanelContainer_Id .main-nowPlayingView-content,
+html.terminal-full #Desktop_PanelContainer_Id .main-buddyFeed-container {
   background-image: none !important;
   background-color: var(--term-bg) !important;
 }
 
-html.terminal-full #Desktop_PanelContainer_Id :is(h2, h3),
+html.terminal-full #Desktop_PanelContainer_Id h2,
+html.terminal-full #Desktop_PanelContainer_Id h3,
 html.terminal-full #Desktop_PanelContainer_Id :is(.main-nowPlayingView-sectionHeaderText, .main-buddyFeed-headerTitle, .main-devicePicker-sectionHeading, .main-devicePicker-headingTitle, .main-devicePicker-heading:not(:has(.main-devicePicker-headingTitle)), .main-nowPlayingView-creditsHeader):not(:is(h2, h3, h2 *, h3 *)):not(:has(h2, h3)) {
   font-size: 13px !important;
   font-weight: 700 !important;
   letter-spacing: 0 !important;
 }
 
-html.terminal-full #Desktop_PanelContainer_Id :is(h2, h3)::before,
+html.terminal-full #Desktop_PanelContainer_Id h2::before,
+html.terminal-full #Desktop_PanelContainer_Id h3::before,
 html.terminal-full #Desktop_PanelContainer_Id :is(.main-nowPlayingView-sectionHeaderText, .main-buddyFeed-headerTitle, .main-devicePicker-sectionHeading, .main-devicePicker-headingTitle, .main-devicePicker-heading:not(:has(.main-devicePicker-headingTitle)), .main-nowPlayingView-creditsHeader):not(:is(h2, h3, h2 *, h3 *)):not(:has(h2, h3))::before {
   content: "# ";
   color: var(--term-green);
 }
 
 /* Panel header (title + "…" + close ✕) */
-html.terminal-full :is(.main-nowPlayingView-header, .main-nowPlayingView-headerContainer) {
+html.terminal-full .main-nowPlayingView-header,
+html.terminal-full .main-nowPlayingView-headerContainer {
   border-bottom: 1px solid var(--term-border);
   background: var(--term-bg) !important;
 }
@@ -2791,7 +2856,8 @@ html.terminal-full .main-nowPlayingView-coverArtContainer {
   outline-offset: 3px;
 }
 
-html.terminal-full .main-nowPlayingView-contextItemInfo :is(a, span)[data-encore-id="text"],
+html.terminal-full .main-nowPlayingView-contextItemInfo a[data-encore-id="text"],
+html.terminal-full .main-nowPlayingView-contextItemInfo span[data-encore-id="text"],
 html.terminal-full .main-nowPlayingView-contextItemInfo .encore-text-headline-small,
 html.terminal-full .main-nowPlayingView-contextItemInfo .encore-text-headline-large {
   letter-spacing: 0 !important;
@@ -2808,12 +2874,20 @@ html.terminal-full .main-nowPlayingView-nextInQueue {
   transition: border-color var(--tf-fast) var(--tf-ease);
 }
 
-html.terminal-full :is(.main-nowPlayingView-section, .main-nowPlayingView-aboutArtist, .main-nowPlayingView-artistOnTour, .main-nowPlayingView-credits, .main-nowPlayingView-nextInQueue):hover {
+html.terminal-full .main-nowPlayingView-section:hover,
+html.terminal-full .main-nowPlayingView-aboutArtist:hover,
+html.terminal-full .main-nowPlayingView-artistOnTour:hover,
+html.terminal-full .main-nowPlayingView-credits:hover,
+html.terminal-full .main-nowPlayingView-nextInQueue:hover {
   border-color: var(--term-green-dim);
 }
 
 /* Nested cards: only the outer one gets the frame. */
-html.terminal-full :is(.main-nowPlayingView-section, .main-nowPlayingView-aboutArtist, .main-nowPlayingView-artistOnTour, .main-nowPlayingView-credits, .main-nowPlayingView-nextInQueue) :is(.main-nowPlayingView-section, .main-nowPlayingView-aboutArtist, .main-nowPlayingView-artistOnTour, .main-nowPlayingView-credits, .main-nowPlayingView-nextInQueue) {
+html.terminal-full :is(.main-nowPlayingView-section, .main-nowPlayingView-aboutArtist, .main-nowPlayingView-artistOnTour, .main-nowPlayingView-credits, .main-nowPlayingView-nextInQueue) .main-nowPlayingView-section,
+html.terminal-full :is(.main-nowPlayingView-section, .main-nowPlayingView-aboutArtist, .main-nowPlayingView-artistOnTour, .main-nowPlayingView-credits, .main-nowPlayingView-nextInQueue) .main-nowPlayingView-aboutArtist,
+html.terminal-full :is(.main-nowPlayingView-section, .main-nowPlayingView-aboutArtist, .main-nowPlayingView-artistOnTour, .main-nowPlayingView-credits, .main-nowPlayingView-nextInQueue) .main-nowPlayingView-artistOnTour,
+html.terminal-full :is(.main-nowPlayingView-section, .main-nowPlayingView-aboutArtist, .main-nowPlayingView-artistOnTour, .main-nowPlayingView-credits, .main-nowPlayingView-nextInQueue) .main-nowPlayingView-credits,
+html.terminal-full :is(.main-nowPlayingView-section, .main-nowPlayingView-aboutArtist, .main-nowPlayingView-artistOnTour, .main-nowPlayingView-credits, .main-nowPlayingView-nextInQueue) .main-nowPlayingView-nextInQueue {
   border: 0;
 }
 
@@ -2842,7 +2916,10 @@ html.terminal-full .main-nowPlayingView-onTourTimeMonth {
 }
 
 /* ls-style rows: queue preview, queue panel, friend activity, devices. */
-html.terminal-full :is(.main-nowPlayingView-queueItem, .main-nowPlayingView-artistOnTourItem, .main-buddyFeed-friendActivity, .main-devicePicker-devicesList > li),
+html.terminal-full .main-nowPlayingView-queueItem:not(tf-nx),
+html.terminal-full .main-nowPlayingView-artistOnTourItem:not(tf-nx),
+html.terminal-full .main-buddyFeed-friendActivity:not(tf-nx),
+html.terminal-full .main-devicePicker-devicesList > li,
 html.terminal-full #Desktop_PanelContainer_Id [data-encore-id="listRow"] {
   position: relative;
   background-color: transparent !important;
@@ -2854,7 +2931,10 @@ html.terminal-full #Desktop_PanelContainer_Id [data-encore-id="listRow"] {
   animation: tfp-row-in var(--tf-med) var(--tf-ease) backwards;
 }
 
-html.terminal-full :is(.main-nowPlayingView-queueItem, .main-nowPlayingView-artistOnTourItem, .main-buddyFeed-friendActivity, .main-devicePicker-devicesList > li):hover,
+html.terminal-full .main-nowPlayingView-queueItem:not(tf-nx):hover,
+html.terminal-full .main-nowPlayingView-artistOnTourItem:not(tf-nx):hover,
+html.terminal-full .main-buddyFeed-friendActivity:not(tf-nx):hover,
+html.terminal-full .main-devicePicker-devicesList > li:hover,
 html.terminal-full #Desktop_PanelContainer_Id [data-encore-id="listRow"]:hover {
   background-color: var(--term-bg-hi) !important;
   box-shadow: inset 2px 0 0 0 var(--term-green);
@@ -2877,7 +2957,8 @@ html.terminal-full #Desktop_PanelContainer_Id :is(img, .main-avatar-avatar, .mai
   border-radius: 0 !important;
 }
 
-html.terminal-full :is(.main-nowPlayingView-queueItemEntityImage, .main-buddyFeed-avatarContainer) {
+html.terminal-full .main-nowPlayingView-queueItemEntityImage,
+html.terminal-full .main-buddyFeed-avatarContainer {
   outline: 1px solid var(--term-border);
   outline-offset: 1px;
 }
@@ -2939,7 +3020,8 @@ html.terminal-full .main-devicePicker-devicesList > li {
   border-bottom: 1px dashed var(--term-border);
 }
 
-html.terminal-full :is(.main-devicePicker-headingConnected, .main-devicePicker-connected) {
+html.terminal-full .main-devicePicker-headingConnected,
+html.terminal-full .main-devicePicker-connected {
   color: var(--term-green) !important;
 }
 
@@ -2970,7 +3052,13 @@ html.terminal-full .main-nowPlayingView-section {
   --lyrics-color-background: var(--term-bg) !important;
 }
 
-html.terminal-full :is(.lyrics-lyrics-background, .lyrics-lyrics-container, .lyrics-lyrics-contentWrapper, .main-nowPlayingView-lyricsGradient, .Root__lyrics-cinema, .main-lyricsCinema-container, .lyrics-lyricsContainer-LyricsBackground) {
+html.terminal-full .lyrics-lyrics-background,
+html.terminal-full .lyrics-lyrics-container,
+html.terminal-full .lyrics-lyrics-contentWrapper,
+html.terminal-full .main-nowPlayingView-lyricsGradient,
+html.terminal-full .Root__lyrics-cinema,
+html.terminal-full .main-lyricsCinema-container,
+html.terminal-full .lyrics-lyricsContainer-LyricsBackground {
   background-color: var(--term-bg) !important;
   background-image: none !important;
 }
@@ -2980,44 +3068,53 @@ html.terminal-full .main-nowPlayingView-lyricsContent {
   mask-image: none !important;
 }
 
-html.terminal-full :is(.lyrics-lyricsContent-lyric, .lyrics-lyricsContainer-LyricsLine) {
+html.terminal-full .lyrics-lyricsContent-lyric,
+html.terminal-full .lyrics-lyricsContainer-LyricsLine {
   color: var(--term-subdued) !important;
   letter-spacing: 0 !important;
   font-weight: 600;
   transition: color var(--tf-med) var(--tf-ease), opacity var(--tf-med) var(--tf-ease);
 }
 
-html.terminal-full :is(.lyrics-lyricsContent-lyric, .lyrics-lyricsContainer-LyricsLine):not(:empty)::before {
+html.terminal-full .lyrics-lyricsContent-lyric:not(:empty)::before,
+html.terminal-full .lyrics-lyricsContainer-LyricsLine:not(:empty)::before {
   content: "> ";
   color: var(--term-border);
   white-space: pre;
 }
 
-html.terminal-full :is(.lyrics-lyricsContent-previous, .lyrics-lyricsContent-highlight, .lyrics-lyricsContainer-LyricsLine-past) {
+html.terminal-full .lyrics-lyricsContent-previous,
+html.terminal-full .lyrics-lyricsContent-highlight,
+html.terminal-full .lyrics-lyricsContainer-LyricsLine-past {
   opacity: 0.5;
 }
 
-html.terminal-full :is(.lyrics-lyricsContent-lyric.lyrics-lyricsContent-active, .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active) {
+html.terminal-full .lyrics-lyricsContent-lyric.lyrics-lyricsContent-active,
+html.terminal-full .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active {
   color: var(--term-green) !important;
   opacity: 1;
 }
 
-html.terminal-full :is(.lyrics-lyricsContent-lyric.lyrics-lyricsContent-active, .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active)::before {
+html.terminal-full .lyrics-lyricsContent-lyric.lyrics-lyricsContent-active::before,
+html.terminal-full .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active::before {
   color: var(--term-green);
 }
 
-html.terminal-full :is(.lyrics-lyricsContent-lyric.lyrics-lyricsContent-active, .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active):not(:empty)::after {
+html.terminal-full .lyrics-lyricsContent-lyric.lyrics-lyricsContent-active:not(:empty)::after,
+html.terminal-full .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active:not(:empty)::after {
   content: "▋";
   margin-left: 0.25em;
   animation: term-blink 1s step-end infinite;
 }
 
-html.terminal-full :is(.lyrics-lyricsContent-provider, .lyrics-lyricsContainer-Provider) {
+html.terminal-full .lyrics-lyricsContent-provider,
+html.terminal-full .lyrics-lyricsContainer-Provider {
   color: var(--term-subdued) !important;
   font-size: 11px !important;
 }
 
-html.terminal-full :is(.lyrics-lyricsContent-provider, .lyrics-lyricsContainer-Provider)::before {
+html.terminal-full .lyrics-lyricsContent-provider::before,
+html.terminal-full .lyrics-lyricsContainer-Provider::before {
   content: "# ";
   color: var(--term-green);
 }
@@ -3027,24 +3124,26 @@ html.terminal-full :is(.lyrics-lyricsContent-provider, .lyrics-lyricsContainer-P
    the cover, frame the up-next card. The transport, seek bar and volume
    already pick up the status line rules above through their data-testids,
    and the bottom bar gets the same top rule and tinted background. */
-html.terminal-full :is(.Root__cinema-view, .npv-main-container) {
+html.terminal-full .Root__cinema-view,
+html.terminal-full .npv-main-container {
   background: var(--term-bg) !important;
 }
 
-html.terminal-full :is(.npv-background-image, .npv-background-image__overlay, .npv-background-color, .npv-blur, .npv-lyrics__gradient-background) {
+html.terminal-full .npv-background-image,
+html.terminal-full .npv-background-image__overlay,
+html.terminal-full .npv-background-color,
+html.terminal-full .npv-blur,
+html.terminal-full .npv-lyrics__gradient-background {
   display: none !important;
 }
 
-html.terminal-full .npv-main-container :is(svg[aria-label="Spotify"], a[aria-label="Spotify"]) {
+html.terminal-full .npv-main-container svg[aria-label="Spotify"],
+html.terminal-full .npv-main-container a[aria-label="Spotify"] {
   display: none !important;
 }
 
 html.terminal-full .npv-main-container *,
-html.terminal-full .npv-main-container *::before,
-html.terminal-full .npv-main-container *::after,
-html.terminal-full .Root__cinema-view *,
-html.terminal-full .Root__cinema-view *::before,
-html.terminal-full .Root__cinema-view *::after {
+html.terminal-full .Root__cinema-view * {
   border-radius: 0 !important;
 }
 
@@ -3060,7 +3159,8 @@ html.terminal-full .npv-cover-art {
   box-shadow: none !important;
 }
 
-html.terminal-full .npv-track :is(a, span) {
+html.terminal-full .npv-track a,
+html.terminal-full .npv-track span {
   letter-spacing: 0 !important;
 }
 
@@ -3078,7 +3178,8 @@ html.terminal-full .npv-up-next::before {
   color: var(--term-green);
 }
 
-html.terminal-full :is(.npv-nowPlayingBar-container, .main-lyricsCinema-controls) {
+html.terminal-full .npv-nowPlayingBar-container,
+html.terminal-full .main-lyricsCinema-controls {
   background: var(--term-bg-tinted) !important;
   border-top: 1px solid var(--term-border);
 }
@@ -3114,9 +3215,10 @@ html.terminal-full .npv-exitFullScreenButton-button:is(:hover, :focus-visible) {
    and the lyrics caret blink outright, so nothing is left running. */
 @media (prefers-reduced-motion: reduce) {
   html.terminal-full :is(.main-nowPlayingView-queueItem, .main-nowPlayingView-artistOnTourItem, .main-buddyFeed-friendActivity, .main-devicePicker-devicesList > li, #Desktop_PanelContainer_Id [data-encore-id="listRow"]),
-  html.terminal-full .Root__now-playing-bar::before,
-  html.terminal-full .main-nowPlayingWidget-coverArt::after,
-  html.terminal-full :is(.lyrics-lyricsContent-active, .lyrics-lyricsContainer-LyricsLine-active)::after {
+html.terminal-full .Root__now-playing-bar::before,
+html.terminal-full .main-nowPlayingWidget-coverArt::after,
+html.terminal-full .lyrics-lyricsContent-active::after,
+html.terminal-full .lyrics-lyricsContainer-LyricsLine-active::after {
     animation: none !important;
   }
 }
@@ -3197,14 +3299,15 @@ html.terminal-full .encore-dark-theme .encore-inverted-light-set {
    chips, buttons, inputs, tiles. One broad rule instead of a whitelist,
    because every "rounded" surface in there is a Spotify tell. */
 html.terminal-full .Root__main-view,
-html.terminal-full .Root__main-view *,
-html.terminal-full .Root__main-view *::before,
-html.terminal-full .Root__main-view *::after {
+html.terminal-full .Root__main-view * {
   border-radius: 0 !important;
 }
 
 /* Covers get a flat 1px frame instead of Spotify's soft drop shadow. */
-html.terminal-full .Root__main-view :is(.main-card-imageContainer, .main-entityHeader-imageContainer, .x-entityImage-imageContainer, .view-homeShortcutsGrid-imageContainer) {
+html.terminal-full .Root__main-view .main-card-imageContainer,
+html.terminal-full .Root__main-view .main-entityHeader-imageContainer,
+html.terminal-full .Root__main-view .x-entityImage-imageContainer,
+html.terminal-full .Root__main-view .view-homeShortcutsGrid-imageContainer {
   box-shadow: none !important;
 }
 
@@ -3345,7 +3448,11 @@ html.terminal-full .view-homeShortcutsGrid-shortcut:hover .view-homeShortcutsGri
 }
 
 /* Liked-songs "equaliser" GIF in the shortcut → a steady ▶ in our teal. */
-html.terminal-full .Root__main-view :is(.view-homeShortcutsGrid-equaliser, .view-homeShortcutsGrid-equaliserImage, .view-homeShortcutsGrid-playingIcon, .main-trackList-playingIcon, img[src*="equaliser"]) {
+html.terminal-full .Root__main-view .view-homeShortcutsGrid-equaliser:not(tf-nx),
+html.terminal-full .Root__main-view .view-homeShortcutsGrid-equaliserImage:not(tf-nx),
+html.terminal-full .Root__main-view .view-homeShortcutsGrid-playingIcon:not(tf-nx),
+html.terminal-full .Root__main-view .main-trackList-playingIcon:not(tf-nx),
+html.terminal-full .Root__main-view img[src*="equaliser"] {
   display: none !important;
 }
 
@@ -3361,7 +3468,9 @@ html.terminal-full .Root__main-view .main-trackList-rowSectionIndex:has(> :is(.m
 /* Shelves: `$ ls ~/<shelf>` headings, "Show all" as [+more]. Search
    result sections and the browse grid heading use the same treatment so
    every listing in the app reads alike. */
-html.terminal-full .Root__main-view :is(.main-shelf-title, .search-searchBrowse-SearchBrowse h2, #searchPage section > h2) {
+html.terminal-full .Root__main-view .main-shelf-title:not(#tf-nx):not(tf-nx):not(tf-nx),
+html.terminal-full .Root__main-view .search-searchBrowse-SearchBrowse h2:not(#tf-nx):not(tf-nx),
+html.terminal-full .Root__main-view #searchPage section > h2 {
   font-size: 15px !important;
   font-weight: 600 !important;
   letter-spacing: 0 !important;
@@ -3369,7 +3478,9 @@ html.terminal-full .Root__main-view :is(.main-shelf-title, .search-searchBrowse-
   line-height: 1.4 !important;
 }
 
-html.terminal-full .Root__main-view :is(.main-shelf-title, .search-searchBrowse-SearchBrowse h2, #searchPage section > h2)::before {
+html.terminal-full .Root__main-view .main-shelf-title:not(#tf-nx):not(tf-nx):not(tf-nx)::before,
+html.terminal-full .Root__main-view .search-searchBrowse-SearchBrowse h2:not(#tf-nx):not(tf-nx)::before,
+html.terminal-full .Root__main-view #searchPage section > h2::before {
   content: "$ ls ~/";
   color: var(--term-green);
   font-weight: 400;
@@ -3402,20 +3513,26 @@ html.terminal-full .Root__main-view .main-shelf-subHeader::before {
 
 /* The native text keeps its accessible name (font-size:0, not display:none);
    the visible label is drawn by ::after. */
-html.terminal-full .Root__main-view :is(.main-shelf-seeAll, .main-seeAll-link, .search-recentSearches-seeAll),
+html.terminal-full .Root__main-view .main-shelf-seeAll,
+html.terminal-full .Root__main-view .main-seeAll-link,
+html.terminal-full .Root__main-view .search-recentSearches-seeAll,
 html.terminal-full .Root__main-view :is(.main-shelf-seeAll, .main-seeAll-link, .search-recentSearches-seeAll) * {
   font-size: 0 !important;
   text-decoration: none !important;
 }
 
-html.terminal-full .Root__main-view :is(.main-shelf-seeAll, .main-seeAll-link, .search-recentSearches-seeAll) {
+html.terminal-full .Root__main-view .main-shelf-seeAll,
+html.terminal-full .Root__main-view .main-seeAll-link,
+html.terminal-full .Root__main-view .search-recentSearches-seeAll {
   display: inline-flex !important;
   align-items: center;
   min-block-size: 32px;
   padding-inline: 4px;
 }
 
-html.terminal-full .Root__main-view :is(.main-shelf-seeAll, .main-seeAll-link, .search-recentSearches-seeAll)::after {
+html.terminal-full .Root__main-view .main-shelf-seeAll::after,
+html.terminal-full .Root__main-view .main-seeAll-link::after,
+html.terminal-full .Root__main-view .search-recentSearches-seeAll::after {
   content: "[+more]";
   font-size: 12px;
   font-weight: 500;
@@ -3423,7 +3540,9 @@ html.terminal-full .Root__main-view :is(.main-shelf-seeAll, .main-seeAll-link, .
   transition: color var(--tf-fast) var(--tf-ease);
 }
 
-html.terminal-full .Root__main-view :is(.main-shelf-seeAll, .main-seeAll-link, .search-recentSearches-seeAll):hover::after {
+html.terminal-full .Root__main-view .main-shelf-seeAll:hover::after,
+html.terminal-full .Root__main-view .main-seeAll-link:hover::after,
+html.terminal-full .Root__main-view .search-recentSearches-seeAll:hover::after {
   color: var(--term-green);
 }
 
@@ -3437,7 +3556,9 @@ html.terminal-full .Root__main-view .main-shelf-section + .main-shelf-section {
    Square file boxes: flat tinted fill, 1px frame, mono title. Hover:
    frame turns teal, the title flips to inverse video with a left-to-right
    sweep, and a single scan line runs down the cover. No lift, no glow. */
-html.terminal-full .Root__main-view :is(.main-card-card, .main-heroCard-card, [data-testid="top-result-card"]) {
+html.terminal-full .Root__main-view .main-card-card,
+html.terminal-full .Root__main-view .main-heroCard-card,
+html.terminal-full .Root__main-view [data-testid="top-result-card"] {
   background: var(--term-bg-tinted) !important;
   border: 1px solid var(--term-border) !important;
   box-shadow: none !important;
@@ -3445,8 +3566,12 @@ html.terminal-full .Root__main-view :is(.main-card-card, .main-heroCard-card, [d
   transition: border-color var(--tf-fast) var(--tf-ease), background-color var(--tf-fast) var(--tf-ease);
 }
 
-html.terminal-full .Root__main-view :is(.main-card-card, .main-heroCard-card, [data-testid="top-result-card"]):hover,
-html.terminal-full .Root__main-view :is(.main-card-card, .main-heroCard-card, [data-testid="top-result-card"]):focus-within {
+html.terminal-full .Root__main-view .main-card-card:hover,
+html.terminal-full .Root__main-view .main-heroCard-card:hover,
+html.terminal-full .Root__main-view [data-testid="top-result-card"]:hover,
+html.terminal-full .Root__main-view .main-card-card:focus-within,
+html.terminal-full .Root__main-view .main-heroCard-card:focus-within,
+html.terminal-full .Root__main-view [data-testid="top-result-card"]:focus-within {
   background: var(--term-bg-elevated) !important;
   border-color: var(--term-green) !important;
   box-shadow: none !important;
@@ -3483,7 +3608,8 @@ html.terminal-full .Root__main-view .main-card-card:hover .main-card-imageContai
   to { opacity: 1; transform: translateY(0); }
 }
 
-html.terminal-full .Root__main-view :is(.main-card-cardTitle, .main-card-cardTitleLink) {
+html.terminal-full .Root__main-view .main-card-cardTitle,
+html.terminal-full .Root__main-view .main-card-cardTitleLink {
   position: relative;
   isolation: isolate;
   font-size: 13px !important;
@@ -3543,7 +3669,9 @@ html.terminal-full .Root__main-view :is(.main-shelf-shelfGrid, .main-gridContain
 /* Hover play button on cards / shortcuts / hero cards: a square [▶].
    The native SVG stays (it is what flips between play and pause), just
    tinted teal and flanked by brackets. */
-html.terminal-full .Root__main-view :is(.main-card-PlayButtonContainer, .view-homeShortcutsGrid-PlayButtonContainer, .main-heroCard-PlayButtonContainer) {
+html.terminal-full .Root__main-view .main-card-PlayButtonContainer,
+html.terminal-full .Root__main-view .view-homeShortcutsGrid-PlayButtonContainer,
+html.terminal-full .Root__main-view .main-heroCard-PlayButtonContainer {
   box-shadow: none !important;
 }
 
@@ -3602,7 +3730,8 @@ html.terminal-full .Root__main-view :is(.main-card-PlayButtonContainer, .view-ho
    4px left bar (a background-image drawn over the inline colour, which it
    cannot beat otherwise) and drop the rotated art: a monochrome box with
    a mono label and a `cd ›` hint on hover. */
-html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="heroCategoryCard-HeroCategoryCard"]) {
+html.terminal-full .Root__main-view .x-categoryCard-CategoryCard,
+html.terminal-full .Root__main-view [class*="heroCategoryCard-HeroCategoryCard"] {
   background-image: linear-gradient(90deg, transparent 0 4px, var(--term-bg-tinted) 4px) !important;
   border: 1px solid var(--term-border) !important;
   box-shadow: none !important;
@@ -3612,14 +3741,17 @@ html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="h
   transition: border-color var(--tf-fast) var(--tf-ease);
 }
 
-html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="heroCategoryCard-HeroCategoryCard"]):hover,
-html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="heroCategoryCard-HeroCategoryCard"]):focus-visible {
+html.terminal-full .Root__main-view .x-categoryCard-CategoryCard:hover,
+html.terminal-full .Root__main-view [class*="heroCategoryCard-HeroCategoryCard"]:hover,
+html.terminal-full .Root__main-view .x-categoryCard-CategoryCard:focus-visible,
+html.terminal-full .Root__main-view [class*="heroCategoryCard-HeroCategoryCard"]:focus-visible {
   border-color: var(--term-green) !important;
 }
 
 /* The cover stays as a small, straight, greyscale thumbnail in the
    corner — texture without the vivid rotated sticker. */
-html.terminal-full .Root__main-view :is(.x-categoryCard-image, [class*="heroCategoryCard-image"]) {
+html.terminal-full .Root__main-view .x-categoryCard-image,
+html.terminal-full .Root__main-view [class*="heroCategoryCard-image"] {
   inset: auto 10px 10px auto !important;
   inline-size: 30% !important;
   block-size: auto !important;
@@ -3632,11 +3764,13 @@ html.terminal-full .Root__main-view :is(.x-categoryCard-image, [class*="heroCate
   transition: opacity var(--tf-fast) var(--tf-ease);
 }
 
-html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="heroCategoryCard-HeroCategoryCard"]):hover :is(.x-categoryCard-image, [class*="heroCategoryCard-image"]) {
+html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="heroCategoryCard-HeroCategoryCard"]):hover .x-categoryCard-image,
+html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="heroCategoryCard-HeroCategoryCard"]):hover [class*="heroCategoryCard-image"] {
   opacity: 0.6;
 }
 
-html.terminal-full .Root__main-view :is(.x-categoryCard-title, [class*="heroCategoryCard-heroTitle"]) {
+html.terminal-full .Root__main-view .x-categoryCard-title,
+html.terminal-full .Root__main-view [class*="heroCategoryCard-heroTitle"] {
   color: var(--term-text) !important;
   font-size: 14px !important;
   font-weight: 600 !important;
@@ -3646,13 +3780,15 @@ html.terminal-full .Root__main-view :is(.x-categoryCard-title, [class*="heroCate
   padding-inline: 2px;
 }
 
-html.terminal-full .Root__main-view :is(.x-categoryCard-title, [class*="heroCategoryCard-heroTitle"])::before {
+html.terminal-full .Root__main-view .x-categoryCard-title::before,
+html.terminal-full .Root__main-view [class*="heroCategoryCard-heroTitle"]::before {
   content: "~/";
   color: var(--term-subdued);
   font-weight: 400;
 }
 
-html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="heroCategoryCard-HeroCategoryCard"])::after {
+html.terminal-full .Root__main-view .x-categoryCard-CategoryCard::after,
+html.terminal-full .Root__main-view [class*="heroCategoryCard-HeroCategoryCard"]::after {
   content: "cd ›";
   position: absolute;
   left: 16px;
@@ -3665,12 +3801,14 @@ html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="h
   pointer-events: none;
 }
 
-html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="heroCategoryCard-HeroCategoryCard"]):hover::after {
+html.terminal-full .Root__main-view .x-categoryCard-CategoryCard:hover::after,
+html.terminal-full .Root__main-view [class*="heroCategoryCard-HeroCategoryCard"]:hover::after {
   opacity: 1;
   transform: none;
 }
 
-html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="heroCategoryCard-HeroCategoryCard"]):hover :is(.x-categoryCard-title, [class*="heroCategoryCard-heroTitle"]) {
+html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="heroCategoryCard-HeroCategoryCard"]):hover .x-categoryCard-title,
+html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="heroCategoryCard-HeroCategoryCard"]):hover [class*="heroCategoryCard-heroTitle"] {
   color: var(--term-green) !important;
 }
 
@@ -3710,7 +3848,8 @@ html.terminal-full .Root__main-view .main-entityHeader-title {
   overflow: hidden;
 }
 
-html.terminal-full .Root__main-view .main-entityHeader-title :is(h1, h2) {
+html.terminal-full .Root__main-view .main-entityHeader-title h1,
+html.terminal-full .Root__main-view .main-entityHeader-title h2 {
   font-size: clamp(28px, 4.4vw, 60px) !important;
   font-weight: 700 !important;
   letter-spacing: -0.02em !important;
@@ -3718,13 +3857,15 @@ html.terminal-full .Root__main-view .main-entityHeader-title :is(h1, h2) {
   color: var(--term-text) !important;
 }
 
-html.terminal-full .Root__main-view .main-entityHeader-title :is(h1, h2)::before {
+html.terminal-full .Root__main-view .main-entityHeader-title h1::before,
+html.terminal-full .Root__main-view .main-entityHeader-title h2::before {
   content: "> ";
   color: var(--term-green);
   font-weight: 400;
 }
 
-html.terminal-full .Root__main-view .main-entityHeader-title :is(h1, h2)::after {
+html.terminal-full .Root__main-view .main-entityHeader-title h1::after,
+html.terminal-full .Root__main-view .main-entityHeader-title h2::after {
   content: "▋";
   margin-left: 0.08em;
   color: var(--term-green);
@@ -3870,7 +4011,15 @@ html.terminal-full .Root__main-view :is(.main-actionBar-ActionBarPlayButtonConta
   color: var(--term-bg) !important;
 }
 
-html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-actionBar-shuffleButton, [data-testid="shuffle-button"], .main-addButton-button, [data-testid="add-button"], .main-moreButton-button, [data-testid="more-button"], .x-downloadButton-button, [data-testid="download-button"], .artist-followButton-button) {
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-actionBar-shuffleButton,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="shuffle-button"],
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-addButton-button,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="add-button"],
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-moreButton-button,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="more-button"],
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .x-downloadButton-button,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="download-button"],
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .artist-followButton-button {
   display: inline-flex !important;
   align-items: center;
   justify-content: center;
@@ -3891,7 +4040,15 @@ html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-actio
   transition: border-color var(--tf-fast) var(--tf-ease), color var(--tf-fast) var(--tf-ease);
 }
 
-html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-actionBar-shuffleButton, [data-testid="shuffle-button"], .main-addButton-button, [data-testid="add-button"], .main-moreButton-button, [data-testid="more-button"], .x-downloadButton-button, [data-testid="download-button"], .artist-followButton-button):hover {
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-actionBar-shuffleButton:hover,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="shuffle-button"]:hover,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-addButton-button:hover,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="add-button"]:hover,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-moreButton-button:hover,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="more-button"]:hover,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .x-downloadButton-button:hover,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="download-button"]:hover,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .artist-followButton-button:hover {
   border-color: var(--term-green) !important;
   color: var(--term-text) !important;
 }
@@ -3901,30 +4058,36 @@ html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-actio
   display: none !important;
 }
 
-html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-actionBar-shuffleButton, [data-testid="shuffle-button"])::before {
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-actionBar-shuffleButton::before,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="shuffle-button"]::before {
   content: "⤮";
   font-size: 15px;
 }
 
-html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-actionBar-shuffleButton, [data-testid="shuffle-button"])::after {
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-actionBar-shuffleButton::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="shuffle-button"]::after {
   content: "aléatoire";
 }
 
-html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-addButton-button, [data-testid="add-button"])::before {
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-addButton-button::before,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="add-button"]::before {
   content: "＋";
   font-size: 14px;
 }
 
-html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-addButton-button, [data-testid="add-button"])::after {
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-addButton-button::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="add-button"]::after {
   content: "enregistrer";
 }
 
-html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-moreButton-button, [data-testid="more-button"])::before {
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-moreButton-button::before,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="more-button"]::before {
   content: "⋯";
   font-size: 15px;
 }
 
-html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-moreButton-button, [data-testid="more-button"])::after {
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-moreButton-button::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="more-button"]::after {
   content: "plus";
 }
 
@@ -3935,7 +4098,8 @@ html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.x-download
   block-size: 14px !important;
 }
 
-html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.x-downloadButton-button, [data-testid="download-button"])[aria-label]::after {
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .x-downloadButton-button[aria-label]::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="download-button"][aria-label]::after {
   content: attr(aria-label);
   display: inline-block;
   max-inline-size: 16ch;
@@ -3946,21 +4110,27 @@ html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.x-download
 }
 
 /* On states: shuffle on, saved to library, following. */
-html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-actionBar-shuffleButton, [data-testid="shuffle-button"], .main-addButton-button, [data-testid="add-button"]):is([aria-checked="true"], [aria-pressed="true"], .main-addButton-active),
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-actionBar-shuffleButton:is([aria-checked="true"], [aria-pressed="true"], .main-addButton-active),
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="shuffle-button"]:is([aria-checked="true"], [aria-pressed="true"], .main-addButton-active),
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-addButton-button:is([aria-checked="true"], [aria-pressed="true"], .main-addButton-active),
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="add-button"]:is([aria-checked="true"], [aria-pressed="true"], .main-addButton-active),
 html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .artist-followButton-followed {
   color: var(--term-green) !important;
   border-color: var(--term-green-dim) !important;
 }
 
-html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-addButton-button, [data-testid="add-button"]):is([aria-checked="true"], .main-addButton-active)::before {
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-addButton-button:is([aria-checked="true"], .main-addButton-active)::before,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="add-button"]:is([aria-checked="true"], .main-addButton-active)::before {
   content: "♥\FE0E";
 }
 
-html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-addButton-button, [data-testid="add-button"]):is([aria-checked="true"], .main-addButton-active)::after {
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-addButton-button:is([aria-checked="true"], .main-addButton-active)::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="add-button"]:is([aria-checked="true"], .main-addButton-active)::after {
   content: "enregistré";
 }
 
-html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-actionBar-shuffleButton, [data-testid="shuffle-button"]):is([aria-checked="true"], [aria-pressed="true"])::after {
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-actionBar-shuffleButton:is([aria-checked="true"], [aria-pressed="true"])::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="shuffle-button"]:is([aria-checked="true"], [aria-pressed="true"])::after {
   content: "aléatoire: on";
 }
 
@@ -4025,7 +4195,8 @@ html.terminal-full .Root__main-view .main-trackList-trackListRow:hover .main-tra
   color: var(--term-text) !important;
 }
 
-html.terminal-full .Root__main-view :is(.main-trackList-selected, [aria-selected="true"] > .main-trackList-trackListRow) {
+html.terminal-full .Root__main-view .main-trackList-selected.main-trackList-selected,
+html.terminal-full .Root__main-view [aria-selected="true"] > .main-trackList-trackListRow {
   background-color: color-mix(in srgb, var(--term-green) 16%, var(--term-bg)) !important;
 }
 
@@ -4034,7 +4205,9 @@ html.terminal-full .Root__main-view .main-trackList-trackListRow:is(.main-trackL
   box-shadow: inset 2px 0 0 var(--term-green) !important;
 }
 
-html.terminal-full .Root__main-view .main-trackList-trackListRow:is(.main-trackList-active, :has(.main-trackList-playingIcon)) :is(.main-trackList-rowMainContentTitle, .main-trackList-rowTitle, .main-trackList-number) {
+html.terminal-full .Root__main-view .main-trackList-trackListRow:is(.main-trackList-active, :has(.main-trackList-playingIcon)) .main-trackList-rowMainContentTitle,
+html.terminal-full .Root__main-view .main-trackList-trackListRow:is(.main-trackList-active, :has(.main-trackList-playingIcon)) .main-trackList-rowTitle,
+html.terminal-full .Root__main-view .main-trackList-trackListRow:is(.main-trackList-active, :has(.main-trackList-playingIcon)) .main-trackList-number {
   color: var(--term-green) !important;
 }
 
@@ -4044,7 +4217,8 @@ html.terminal-full .Root__main-view :is(.main-trackList-rowImagePlayButton, .mai
 }
 
 /* Explicit and other row badges: plain [E] text, no filled chip. */
-html.terminal-full .Root__main-view :is(.main-trackList-trackListRow .main-tag-container, .x-explicit-label) {
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-tag-container,
+html.terminal-full .Root__main-view .x-explicit-label.x-explicit-label {
   background: transparent !important;
   color: var(--term-subdued) !important;
   padding: 0 !important;
@@ -4054,11 +4228,13 @@ html.terminal-full .Root__main-view :is(.main-trackList-trackListRow .main-tag-c
   line-height: 1 !important;
 }
 
-html.terminal-full .Root__main-view :is(.main-trackList-trackListRow .main-tag-container, .x-explicit-label)::before {
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-tag-container::before,
+html.terminal-full .Root__main-view .x-explicit-label.x-explicit-label::before {
   content: "[";
 }
 
-html.terminal-full .Root__main-view :is(.main-trackList-trackListRow .main-tag-container, .x-explicit-label)::after {
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-tag-container::after,
+html.terminal-full .Root__main-view .x-explicit-label.x-explicit-label::after {
   content: "]";
 }
 
@@ -4068,20 +4244,28 @@ html.terminal-full .Root__main-view .main-trackList-trackListRow :is(.main-track
   display: none !important;
 }
 
-html.terminal-full .Root__main-view .main-trackList-trackListRow :is(.main-trackList-rowHeartButton, .main-addButton-button, [data-testid="add-button"]) {
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-trackList-rowHeartButton,
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-addButton-button,
+html.terminal-full .Root__main-view .main-trackList-trackListRow [data-testid="add-button"] {
   color: var(--term-subdued) !important;
   font-size: 14px;
 }
 
-html.terminal-full .Root__main-view .main-trackList-trackListRow :is(.main-trackList-rowHeartButton, .main-addButton-button, [data-testid="add-button"])::before {
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-trackList-rowHeartButton::before,
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-addButton-button::before,
+html.terminal-full .Root__main-view .main-trackList-trackListRow [data-testid="add-button"]::before {
   content: "＋";
 }
 
-html.terminal-full .Root__main-view .main-trackList-trackListRow :is(.main-trackList-rowHeartButton, .main-addButton-button, [data-testid="add-button"]):is([aria-checked="true"], .main-addButton-active) {
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-trackList-rowHeartButton:is([aria-checked="true"], .main-addButton-active),
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-addButton-button:is([aria-checked="true"], .main-addButton-active),
+html.terminal-full .Root__main-view .main-trackList-trackListRow [data-testid="add-button"]:is([aria-checked="true"], .main-addButton-active) {
   color: var(--term-green) !important;
 }
 
-html.terminal-full .Root__main-view .main-trackList-trackListRow :is(.main-trackList-rowHeartButton, .main-addButton-button, [data-testid="add-button"]):is([aria-checked="true"], .main-addButton-active)::before {
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-trackList-rowHeartButton:is([aria-checked="true"], .main-addButton-active)::before,
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-addButton-button:is([aria-checked="true"], .main-addButton-active)::before,
+html.terminal-full .Root__main-view .main-trackList-trackListRow [data-testid="add-button"]:is([aria-checked="true"], .main-addButton-active)::before {
   content: "♥\FE0E";
 }
 
@@ -4131,7 +4315,10 @@ html.terminal-full .Root__main-view img:is([src*="liked-songs"], [src*="your-epi
   filter: grayscale(1) brightness(0.55) contrast(1.35) !important;
 }
 
-html.terminal-full .Root__main-view :is(.collection-collectionEntityHeroCard-likedSongs, .collection-collectionEntityHeroCard-yourEpisodes, .main-yourEpisodes-yourEpisodesCard, .main-yourEpisodes-coverContainer) {
+html.terminal-full .Root__main-view .collection-collectionEntityHeroCard-likedSongs,
+html.terminal-full .Root__main-view .collection-collectionEntityHeroCard-yourEpisodes,
+html.terminal-full .Root__main-view .main-yourEpisodes-yourEpisodesCard,
+html.terminal-full .Root__main-view .main-yourEpisodes-coverContainer {
   background: var(--term-bg-elevated) !important;
   background-image: none !important;
   border: 1px solid var(--term-border) !important;
@@ -4146,7 +4333,13 @@ html.terminal-full .Root__main-view .main-yourEpisodes-coverIcon svg {
 
 /* ---- 9. Loading skeletons: dim blinking blocks (a cursor blink, 1s
    step-end — no shimmer gradient). */
-html.terminal-full .Root__main-view :is(.main-card-imageContainerSkeleton, .main-trackList-placeholderStart, .main-trackList-placeholderVariable, .main-trackList-placeholderEnd, .main-trackList-placeholderIndex, .collection-collectionEntityHeroCard-skeletonRow, [data-encore-id="skeleton"]) {
+html.terminal-full .Root__main-view .main-card-imageContainerSkeleton,
+html.terminal-full .Root__main-view .main-trackList-placeholderStart,
+html.terminal-full .Root__main-view .main-trackList-placeholderVariable,
+html.terminal-full .Root__main-view .main-trackList-placeholderEnd,
+html.terminal-full .Root__main-view .main-trackList-placeholderIndex,
+html.terminal-full .Root__main-view .collection-collectionEntityHeroCard-skeletonRow,
+html.terminal-full .Root__main-view [data-encore-id="skeleton"] {
   background: var(--term-border) !important;
   background-image: none !important;
   opacity: 0.5;
@@ -4162,7 +4355,8 @@ html.terminal-full .Root__main-view :is(.main-card-imageContainerSkeleton, .main
    `# title`, `[section]` headers, `key ...... = value` rows, toggles
    drawn as [x] / [ ] over the native checkbox input (which still takes
    the click and keeps its role/label). */
-html.terminal-full :is([data-testid="settings-page"], .x-settings-container) {
+html.terminal-full [data-testid="settings-page"],
+html.terminal-full .x-settings-container {
   font-size: 13px;
 }
 
@@ -4176,7 +4370,9 @@ html.terminal-full :is([data-testid="settings-page"], .x-settings-container) h1:
   color: var(--term-green);
 }
 
-html.terminal-full :is([data-testid="settings-page"], .x-settings-container) :is(.x-settings-section h2, .x-settings-headerContainer h2, .x-settings-outputSectionHeader) {
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) .x-settings-section h2,
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) .x-settings-headerContainer h2,
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) .x-settings-outputSectionHeader:not(tf-nx) {
   font-size: 14px !important;
   font-weight: 700 !important;
   letter-spacing: 0 !important;
@@ -4184,11 +4380,15 @@ html.terminal-full :is([data-testid="settings-page"], .x-settings-container) :is
   margin-top: 20px;
 }
 
-html.terminal-full :is([data-testid="settings-page"], .x-settings-container) :is(.x-settings-section h2, .x-settings-headerContainer h2, .x-settings-outputSectionHeader)::before {
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) .x-settings-section h2::before,
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) .x-settings-headerContainer h2::before,
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) .x-settings-outputSectionHeader:not(tf-nx)::before {
   content: "[";
 }
 
-html.terminal-full :is([data-testid="settings-page"], .x-settings-container) :is(.x-settings-section h2, .x-settings-headerContainer h2, .x-settings-outputSectionHeader)::after {
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) .x-settings-section h2::after,
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) .x-settings-headerContainer h2::after,
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) .x-settings-outputSectionHeader:not(tf-nx)::after {
   content: "]";
 }
 
@@ -4229,8 +4429,12 @@ html.terminal-full [data-testid="settings-page"] :is(select, input[type="text"],
   min-block-size: 32px;
 }
 
-html.terminal-full .x-settings-container :is(select, input, textarea):focus-visible,
-html.terminal-full [data-testid="settings-page"] :is(select, input, textarea):focus-visible {
+html.terminal-full .x-settings-container select:focus-visible,
+html.terminal-full .x-settings-container input:focus-visible,
+html.terminal-full .x-settings-container textarea:focus-visible,
+html.terminal-full [data-testid="settings-page"] select:focus-visible,
+html.terminal-full [data-testid="settings-page"] input:focus-visible,
+html.terminal-full [data-testid="settings-page"] textarea:focus-visible {
   border-color: var(--term-green) !important;
 }
 
@@ -4300,9 +4504,15 @@ html.terminal-full .x-settings-equalizerPanelCanvas {
    own ones are switched off outright so nothing even flickers. */
 @media (prefers-reduced-motion: reduce) {
   html.terminal-full .Root__main-view .main-card-card .main-card-imageContainer::after,
-  html.terminal-full .Root__main-view .main-entityHeader-title::after,
-  html.terminal-full .Root__main-view .main-trackList-trackListRow,
-  html.terminal-full .Root__main-view :is(.main-card-imageContainerSkeleton, .main-trackList-placeholderStart, .main-trackList-placeholderVariable, .main-trackList-placeholderEnd, .main-trackList-placeholderIndex, .collection-collectionEntityHeroCard-skeletonRow, [data-encore-id="skeleton"]) {
+html.terminal-full .Root__main-view .main-entityHeader-title::after,
+html.terminal-full .Root__main-view .main-trackList-trackListRow,
+html.terminal-full .Root__main-view .main-card-imageContainerSkeleton,
+html.terminal-full .Root__main-view .main-trackList-placeholderStart,
+html.terminal-full .Root__main-view .main-trackList-placeholderVariable,
+html.terminal-full .Root__main-view .main-trackList-placeholderEnd,
+html.terminal-full .Root__main-view .main-trackList-placeholderIndex,
+html.terminal-full .Root__main-view .collection-collectionEntityHeroCard-skeletonRow,
+html.terminal-full .Root__main-view [data-encore-id="skeleton"] {
     animation: none !important;
   }
 }
@@ -4528,7 +4738,15 @@ html.terminal-full .main-confirmDialog-container * {
   border-radius: 0 !important;
 }
 
-html.terminal-full [role="dialog"][aria-modal="true"] :is(h1, h2, h3, p, span, button, input, label, textarea) {
+html.terminal-full [role="dialog"][aria-modal="true"] h1,
+html.terminal-full [role="dialog"][aria-modal="true"] h2,
+html.terminal-full [role="dialog"][aria-modal="true"] h3,
+html.terminal-full [role="dialog"][aria-modal="true"] p,
+html.terminal-full [role="dialog"][aria-modal="true"] span,
+html.terminal-full [role="dialog"][aria-modal="true"] button,
+html.terminal-full [role="dialog"][aria-modal="true"] input,
+html.terminal-full [role="dialog"][aria-modal="true"] label,
+html.terminal-full [role="dialog"][aria-modal="true"] textarea {
   font-family: var(--term-font) !important;
 }
 
@@ -4894,33 +5112,36 @@ html.terminal-full.terminal-os-mac .terminal-settings::after {
    what they do); only the extra words go. Placed last so it wins.
    ========================================================================== */
 html.terminal-full .Root__globalNav .main-topBar-whatsNewFeed::before { content: "✱" !important; }
-html.terminal-full .Root__globalNav :is(.main-topBar-buddyFeed, .main-globalNav-buddyFeed)::before { content: "☺" !important; }
+html.terminal-full .Root__globalNav .main-topBar-buddyFeed::before,
+html.terminal-full .Root__globalNav .main-globalNav-buddyFeed::before { content: "☺" !important; }
 html.terminal-full .main-yourLibraryX-collapseButton::after { content: none !important; }
 html.terminal-full .main-nowPlayingBar-left::before { content: none !important; display: none !important; }
 html.terminal-full .main-nowPlayingBar-left { padding-left: 12px !important; }
 html.terminal-full [data-testid="volume-bar-toggle-mute-button"]::before { content: none !important; }
 html.terminal-full .npv-exitFullScreenButton-button::before { content: "✕" !important; }
-html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="heroCategoryCard-HeroCategoryCard"])::after { content: none !important; }
+html.terminal-full .Root__main-view .x-categoryCard-CategoryCard::after,
+html.terminal-full .Root__main-view [class*="heroCategoryCard-HeroCategoryCard"]::after { content: none !important; }
 html.terminal-full .Root__main-view :is(.main-actionBar-ActionBarPlayButtonContainer button, .main-actionBar-ActionBarRow [data-testid="play-button"])::after,
 html.terminal-full .Root__main-view :is(.main-actionBar-ActionBarPlayButtonContainer button, .main-actionBar-ActionBarRow [data-testid="play-button"])[data-tf-state]::after {
   content: "]" !important;
 }
-html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(
-  .main-actionBar-shuffleButton, [data-testid="shuffle-button"],
-  .main-addButton-button, [data-testid="add-button"],
-  .main-moreButton-button, [data-testid="more-button"],
-  .x-downloadButton-button, [data-testid="download-button"]
-)::after {
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-actionBar-shuffleButton::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="shuffle-button"]::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-addButton-button::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="add-button"]::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .main-moreButton-button::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="more-button"]::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .x-downloadButton-button::after,
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow [data-testid="download-button"]::after {
   content: none !important;
 }
-html.terminal-full :is(
-  [data-testid="control-button-npv"],
-  [data-testid="lyrics-button"],
-  [data-testid="control-button-queue"],
-  [data-testid="pip-toggle-button"],
-  [data-testid="fullscreen-mode-button"]
-)::after,
-html.terminal-full .main-nowPlayingBar-extraControls :is(.main-devicePicker-controlButton, button[aria-describedby*="connect"])::after {
+html.terminal-full [data-testid="control-button-npv"]::after,
+html.terminal-full [data-testid="lyrics-button"]::after,
+html.terminal-full [data-testid="control-button-queue"]::after,
+html.terminal-full [data-testid="pip-toggle-button"]::after,
+html.terminal-full [data-testid="fullscreen-mode-button"]::after,
+html.terminal-full .main-nowPlayingBar-extraControls .main-devicePicker-controlButton:not(tf-nx)::after,
+html.terminal-full .main-nowPlayingBar-extraControls button[aria-describedby*="connect"]::after {
   content: none !important;
   display: none !important;
 }
@@ -4946,15 +5167,20 @@ html.terminal-full .main-nowPlayingWidget-trackInfo .main-trackInfo-artists .mai
 /* "0:392:43": moving the time labels after the bar with `order` collided
    with the real layout. Native placement (elapsed left, total right of
    the bar) is kept; only the typography stays. */
-html.terminal-full .playback-bar :is(.playback-bar__progress-time-elapsed, [data-testid="playback-position"], .main-playbackBarRemainingTime-container, [data-testid="playback-duration"]) {
+html.terminal-full .playback-bar .playback-bar__progress-time-elapsed,
+html.terminal-full .playback-bar [data-testid="playback-position"],
+html.terminal-full .playback-bar .main-playbackBarRemainingTime-container,
+html.terminal-full .playback-bar [data-testid="playback-duration"] {
   order: 0 !important;
   margin-left: 0 !important;
   min-width: 40px !important;
 }
-html.terminal-full .playback-bar :is(.playback-bar__progress-time-elapsed, [data-testid="playback-position"]) {
+html.terminal-full .playback-bar .playback-bar__progress-time-elapsed,
+html.terminal-full .playback-bar [data-testid="playback-position"] {
   text-align: right !important;
 }
-html.terminal-full .playback-bar :is(.main-playbackBarRemainingTime-container, [data-testid="playback-duration"])::before {
+html.terminal-full .playback-bar .main-playbackBarRemainingTime-container::before,
+html.terminal-full .playback-bar [data-testid="playback-duration"]::before {
   content: none !important;
 }
 
@@ -5031,7 +5257,8 @@ html.terminal-full .Root__main-view .main-entityHeader-pretitle * {
 
 /* "☻🔔" / "☻👥": our glyph was added next to Spotify's own icon. */
 html.terminal-full .Root__globalNav .main-topBar-whatsNewFeed::before,
-html.terminal-full .Root__globalNav :is(.main-topBar-buddyFeed, .main-globalNav-buddyFeed)::before {
+html.terminal-full .Root__globalNav .main-topBar-buddyFeed::before,
+html.terminal-full .Root__globalNav .main-globalNav-buddyFeed::before {
   content: none !important;
 }
 
@@ -5064,8 +5291,12 @@ html.terminal-full .Root__main-view .main-entityHeader-metaData[data-tf-meta] > 
 }
 
 /* "Plavlist": descenders of the small line above the title were clipped. */
-html.terminal-full .Root__main-view :is(.main-entityHeader-headerText, .main-entityHeader-headerTextSection) > :first-child,
-html.terminal-full .Root__main-view :is(.main-entityHeader-headerText, .main-entityHeader-headerTextSection) > :first-child * {
+html.terminal-full .Root__main-view .main-entityHeader-headerText > span:first-child,
+html.terminal-full .Root__main-view .main-entityHeader-headerText > div:first-child,
+html.terminal-full .Root__main-view .main-entityHeader-headerTextSection > span:first-child,
+html.terminal-full .Root__main-view .main-entityHeader-headerTextSection > div:first-child,
+html.terminal-full .Root__main-view .main-entityHeader-headerTextSection > div:first-child > span,
+html.terminal-full .Root__main-view .main-entityHeader-pretitle {
   line-height: 1.5 !important;
   overflow: visible !important;
   padding-bottom: 1px;
@@ -5073,12 +5304,10 @@ html.terminal-full .Root__main-view :is(.main-entityHeader-headerText, .main-ent
 
 /* Transport glyphs (↻ sat low in the active repeat key): the glyph is laid
    over the whole button and centred, whatever Spotify keeps inside it. */
-html.terminal-full :is(
-  [data-testid="control-button-shuffle"],
-  [data-testid="control-button-skip-back"],
-  [data-testid="control-button-skip-forward"],
-  [data-testid="control-button-repeat"]
-) {
+html.terminal-full [data-testid="control-button-shuffle"],
+html.terminal-full [data-testid="control-button-skip-back"],
+html.terminal-full [data-testid="control-button-skip-forward"],
+html.terminal-full [data-testid="control-button-repeat"] {
   position: relative !important;
 }
 html.terminal-full :is(
@@ -5089,12 +5318,10 @@ html.terminal-full :is(
 ) > * {
   visibility: hidden !important;
 }
-html.terminal-full :is(
-  [data-testid="control-button-shuffle"],
-  [data-testid="control-button-skip-back"],
-  [data-testid="control-button-skip-forward"],
-  [data-testid="control-button-repeat"]
-)::before {
+html.terminal-full [data-testid="control-button-shuffle"]::before,
+html.terminal-full [data-testid="control-button-skip-back"]::before,
+html.terminal-full [data-testid="control-button-skip-forward"]::before,
+html.terminal-full [data-testid="control-button-repeat"]::before {
   position: absolute !important;
   inset: 0;
   display: flex !important;
@@ -5110,7 +5337,9 @@ html.terminal-full .Root__now-playing-bar [data-testid="now-playing-widget"] {
 
 /* Empty frame before the bell: the news / friends wrappers were framed
    as keys around Spotify's own framed button. Only the buttons keep one. */
-html.terminal-full .Root__globalNav :is(.main-topBar-whatsNewFeed, .main-topBar-buddyFeed, .main-globalNav-buddyFeed):not(button) {
+html.terminal-full .Root__globalNav .main-topBar-whatsNewFeed:not(button),
+html.terminal-full .Root__globalNav .main-topBar-buddyFeed:not(button),
+html.terminal-full .Root__globalNav .main-globalNav-buddyFeed:not(button) {
   border-color: transparent !important;
   background: transparent !important;
   padding: 0 !important;
