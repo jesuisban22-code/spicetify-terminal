@@ -34,7 +34,7 @@
 	// have Cascadia installed; Cascadia/Consolas only get reached on
 	// Windows (Menlo on macOS), where none of the Linux faces exist.
 	// Shown by the boot log and `neofetch`; keep in sync with CHANGELOG.md.
-	var THEME_VERSION = "1.2.0";
+	var THEME_VERSION = "2.0.0";
 
 	var TERM_FONT_STACK =
 		"'JetBrains Mono', 'Fira Code', 'Hack', 'DejaVu Sans Mono', " +
@@ -1195,6 +1195,12 @@
 	function applyFullConversionSetting() {
 		var on = !!settings.fullConversion;
 		document.documentElement.classList.toggle("terminal-full", on);
+		var pip = window.documentPictureInPicture && window.documentPictureInPicture.window;
+		if (pip && settings.miniPlayerTheme) {
+			var old = pip.document.getElementById("terminal-mini-player-style");
+			if (old) old.parentNode.removeChild(old);
+			injectMiniPlayerStyle(pip);
+		}
 		fullConversionParts.forEach(function (part) {
 			try {
 				if (on) part.setup();
@@ -2309,6 +2315,11 @@
 			"img.main-image-image, [data-encore-id=\"buttonPrimary\"] { border-radius: 0 !important; }",
 			".x-progressBar-progressFillColor, .x-progressBar-fillColor { background-color: #5ebdab !important; }"
 		].join("\n");
+		// Full conversion: the mini player is a separate document that
+		// user.css never reaches, so it gets the status-line styling here.
+		if (document.documentElement.classList.contains("terminal-full") && typeof FULL_PLAYER_PIP_CSS === "string") {
+			style.textContent += "\n" + FULL_PLAYER_PIP_CSS;
+		}
 		win.document.head.appendChild(style);
 	}
 

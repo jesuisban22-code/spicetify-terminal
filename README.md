@@ -27,6 +27,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full list of platform changes.
 
 ## Features
 
+- **Full terminal mode** (on by default): the whole app is rebuilt as a terminal OS: tmux-style panes (`[0:~/library]` `[1:~/home]` `[2:now-playing]`), a `user@terminal:~$` prompt with a command-line search, the library as a file tree, a status line player (`[ ▶ ]`, block seek and volume bars), `ls -l` tracklists, `$ ls ~/…` home shelves, and menus, dialogs and notifications as terminal windows and log lines. The visible Spotify branding (window title, logos, Premium upsells) is replaced or hidden. Switch back to the classic look anytime with the settings row, the palette (`mode native` / `mode full`) or `Ctrl+Shift+Alt+N` (`Cmd+Shift+Alt+N` on macOS).
 - **Boot sequence**: a terminal-style boot log when Spotify starts. Click or press any key to skip it.
 - **Live ASCII-art covers**: album art is redrawn as ASCII on home, search, the library, playlist/album headers and the now-playing bar.
 - **Command palette** (`Ctrl+Shift+K`, `Cmd+Shift+K` on macOS): a small shell for playback, navigation and stats, plus a few easter eggs ([command list](#command-palette)).
@@ -161,6 +162,7 @@ Détails dans le [CHANGELOG](CHANGELOG.md).
 
 ### Fonctionnalités
 
+- **Mode terminal complet** (activé par défaut) : toute l'application devient un OS terminal : panneaux façon tmux (`[0:~/library]` `[1:~/home]` `[2:now-playing]`), prompt `user@terminal:~$` avec une recherche en ligne de commande, bibliothèque en arborescence, lecteur en ligne de statut (`[ ▶ ]`, barres de progression et de volume en blocs), listes de morceaux façon `ls -l`, accueil en `$ ls ~/…`, et menus, fenêtres et notifications façon terminal. La marque Spotify visible (titre de fenêtre, logos, boutons Premium) est remplacée ou masquée. Retour au look classique à tout moment : réglages, palette (`mode native` / `mode full`) ou `Ctrl+Shift+Alt+N` (`Cmd+Shift+Alt+N` sur macOS).
 - **Séquence de démarrage** façon boot terminal au lancement de Spotify (clic ou touche pour passer)
 - **Art de couverture ASCII** en direct sur les pochettes (accueil, recherche, bibliothèque, en-têtes de playlist/album, barre de lecture)
 - **Palette de commandes** (`Ctrl+Shift+K`, `Cmd+Shift+K` sur macOS) : un vrai mini-shell (voir le tableau ci-dessous)
