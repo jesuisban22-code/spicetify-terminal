@@ -1884,7 +1884,9 @@ html.terminal-full .Root__right-sidebar:has(aside:not(:empty))::before {
   inset: 0 auto auto 0;
   width: 0;
   height: 0;
-  z-index: 60;
+  /* Above Spotify's panes (the real client stacks them higher than our
+     first guess of 60, which hid the titles), below menus/modals/badges. */
+  z-index: 9000;
   pointer-events: none;
 }
 
@@ -4919,5 +4921,38 @@ html.terminal-full :is(
 html.terminal-full .main-nowPlayingBar-extraControls :is(.main-devicePicker-controlButton, button[aria-describedby*="connect"])::after {
   content: none !important;
   display: none !important;
+}
+
+/* Fixes from the first real-client screenshot (Windows). */
+
+/* "⌂ ~" was matched by several top-bar buttons (the selector list for the
+   home button is too broad on the real markup), giving four home keys.
+   Native icons come back; only the square frame stays. */
+html.terminal-full :is(.main-globalNav-searchContainer > button, [data-testid="home-button"], .Root__globalNav .main-globalNav-navLink)::before {
+  content: none !important;
+}
+html.terminal-full :is(.main-globalNav-searchContainer > button, [data-testid="home-button"], .Root__globalNav .main-globalNav-navLink) svg {
+  display: revert !important;
+}
+
+/* "— — artist": the artists element is nested in itself on the real
+   client, so the dash was drawn twice. Only the outer one keeps it. */
+html.terminal-full .main-nowPlayingWidget-trackInfo .main-trackInfo-artists .main-trackInfo-artists::before {
+  content: none !important;
+}
+
+/* "0:392:43": moving the time labels after the bar with `order` collided
+   with the real layout. Native placement (elapsed left, total right of
+   the bar) is kept; only the typography stays. */
+html.terminal-full .playback-bar :is(.playback-bar__progress-time-elapsed, [data-testid="playback-position"], .main-playbackBarRemainingTime-container, [data-testid="playback-duration"]) {
+  order: 0 !important;
+  margin-left: 0 !important;
+  min-width: 40px !important;
+}
+html.terminal-full .playback-bar :is(.playback-bar__progress-time-elapsed, [data-testid="playback-position"]) {
+  text-align: right !important;
+}
+html.terminal-full .playback-bar :is(.main-playbackBarRemainingTime-container, [data-testid="playback-duration"])::before {
+  content: none !important;
 }
 /* --- END FULL/CHROME ----------------------------------------------------- */
