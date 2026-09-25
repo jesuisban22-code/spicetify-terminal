@@ -86,7 +86,7 @@
 	// ---------------------------------------------------------------------
 	var FEATURE_REGISTRY = [
 		{ key: "boot", label: "séquence de démarrage au lancement", default: true },
-		{ key: "pulse", label: "pulsation lecture en cours (couleur + tempo)", default: true, setup: function () { setupNowPlayingPulse(); } },
+		{ key: "pulse", label: "pulsation lecture en cours (couleur + tempo)", default: true, setup: function () { setupNowPlayingPulse(); }, onToggle: function () { applyPulseVisuals(); } },
 		{ key: "transitions", label: "transitions de page", default: true, setup: function () { setupPageTransitions(); } },
 		{ key: "typewriter", label: "titres façon machine à écrire", default: true, setup: function () { setupTypewriter(); } },
 		{ key: "palette", label: "palette de commandes (ctrl+maj+k)", default: true, setup: function () { setupCommandPalette(); } },
@@ -491,27 +491,24 @@
 	var trackDataCache = {};
 
 	function setupNowPlayingPulse() {
+		// Track data (cover color + audio-features) is fetched and cached on
+		// every track change regardless of settings.pulse: lastAudioFeatures
+		// also feeds the tempo markers, the visualizer's fallback and the
+		// palette's `stats`, which each check their own setting. Only the
+		// pulse's CSS custom properties are gated on settings.pulse, in
+		// applyPulseVisuals() — which the settings toggle also calls, so
+		// flipping the pulse at runtime takes effect on the current track.
 		function apply(uri) {
-			if (!settings.pulse || !uri) return;
-			currentTrackUri = uri;
+			if (!uri) return;
 			var trackId = uri.split(":")[2];
 			lastExtractedColor = null;
 			lastAudioFeatures = null;
 
 			var cached = trackDataCache[uri];
 			if (cached) {
-				if (cached.color) {
-					lastExtractedColor = cached.color;
-					document.documentElement.style.setProperty("--track-accent", cached.color);
-				}
-				if (cached.features) {
-					lastAudioFeatures = cached.features;
-					var cachedTempo = cached.features.tempo;
-					if (cachedTempo && cachedTempo > 20 && cachedTempo < 300) {
-						document.documentElement.style.setProperty("--track-bpm-ms", Math.round((60000 / cachedTempo) * 2) + "ms");
-					}
-				}
-				if (lastExtractedColor && lastAudioFeatures) applyMoodTint(lastAudioFeatures);
+				if (cached.color) lastExtractedColor = cached.color;
+				if (cached.features) lastAudioFeatures = cached.features;
+				applyPulseVisuals();
 				renderTempoMarkers();
 				return; // already fetched this track this session — no network needed
 			}
@@ -523,10 +520,7 @@
 						var accent = (colors && (colors.VIBRANT || colors.PROMINENT || colors.LIGHT_VIBRANT)) || null;
 						if (accent) {
 							trackDataCache[uri].color = accent;
-							if (!isCurrentTrack(uri)) return; // stale: user already skipped
-							lastExtractedColor = accent;
-							document.documentElement.style.setProperty("--track-accent", accent);
-							if (lastAudioFeatures) applyMoodTint(lastAudioFeatures);
+							applyPulseVisuals();
 						}
 					})
 					.catch(function () {
@@ -542,17 +536,9 @@
 						"?format=json"
 				)
 					.then(function (data) {
-						trackDataCache[uri].features = data;
-						if (!isCurrentTrack(uri)) return; // stale: user already skipped
-						var tempo = data && data.tempo;
-						if (tempo && tempo > 20 && tempo < 300) {
-							// 2 beats per breathing cycle — max-intensity pass: faster,
-							// more visibly "alive" than the original 4-beat cycle.
-							var ms = Math.round((60000 / tempo) * 2);
-							document.documentElement.style.setProperty("--track-bpm-ms", ms + "ms");
-						}
 						lastAudioFeatures = data;
-						if (lastExtractedColor) applyMoodTint(data);
+						trackDataCache[uri].features = data;
+						applyPulseVisuals();
 						renderTempoMarkers();
 					})
 					.catch(function () {
@@ -570,6 +556,29 @@
 		if (Spicetify.Player.data && Spicetify.Player.data.item) {
 			apply(Spicetify.Player.data.item.uri);
 		}
+	}
+
+	// Writes the pulse's CSS custom properties from the current track data
+	// (lastExtractedColor / lastAudioFeatures), or removes them when the
+	// pulse is disabled so user.css falls back to terminal green / 2.4s.
+	// Safe to call at any time: with data still missing it just sets what
+	// it has, and it is idempotent (mood tint is recomputed from the raw
+	// extracted color, never from the already-tinted value).
+	function applyPulseVisuals() {
+		var style = document.documentElement.style;
+		if (!settings.pulse) {
+			style.removeProperty("--track-accent");
+			style.removeProperty("--track-bpm-ms");
+			return;
+		}
+		if (lastExtractedColor) style.setProperty("--track-accent", lastExtractedColor);
+		var tempo = lastAudioFeatures && lastAudioFeatures.tempo;
+		if (tempo && tempo > 20 && tempo < 300) {
+			// 2 beats per breathing cycle — max-intensity pass: faster,
+			// more visibly "alive" than the original 4-beat cycle.
+			style.setProperty("--track-bpm-ms", Math.round((60000 / tempo) * 2) + "ms");
+		}
+		if (lastExtractedColor && lastAudioFeatures) applyMoodTint(lastAudioFeatures);
 	}
 
 	function applyMoodTint(features) {
