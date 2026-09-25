@@ -1418,6 +1418,183 @@
 	// --- END FULL/PLAYER ---------------------------------------------------
 
 	// --- FULL/PAGES: home, search, headers, tracklists (agent C) ----------
+	// Two things in the main view that CSS alone can't express:
+	//
+	// 1. Entity header metadata as `key: value` lines. Spotify renders
+	//    "owner • 50 songs, 3 h 20 min" as a row of sibling pieces with no
+	//    per-piece hook, and the keys we want (owner / year / tracks...)
+	//    aren't in the DOM at all. So each native piece gets a
+	//    data-tf-key attribute (read by CSS via attr()) and the container
+	//    gets data-tf-meta — CSS only switches to the one-per-line layout
+	//    when that marker exists, so if classification ever fails the
+	//    header just keeps its native inline look. Nothing is moved, split
+	//    or re-texted: the owner link stays the same clickable node.
+	//    Classification is by structure first (links to /user/ or
+	//    /artist/), then by shape of the text (a 4-digit year, "N x, d"),
+	//    so it holds across UI languages.
+	//
+	// 2. The action-bar play label: `[ ▶ lire ]` vs `[ ❚❚ pause ]`. The
+	//    native icon already flips on its own; the word needs to know
+	//    whether THIS page's context is the one playing. That comes from
+	//    comparing the route (/playlist/<id> -> spotify:playlist:<id>) with
+	//    Player.data.context; routes we can't map get no attribute and CSS
+	//    falls back to a neutral "lecture" rather than guessing wrong.
+	//
+	// One MutationObserver on .Root__main-view (childList only — never
+	// attributes, so our own data-* writes can't retrigger it), coalesced
+	// into at most one scan per 180ms; each scan is two small
+	// querySelectorAll calls over a handful of nodes, and attributes are
+	// only written when their value actually changes.
+	var tfPages = {
+		active: false,
+		observer: null,
+		timer: 0,
+		rootTimer: 0,
+		onPlayer: null
+	};
+
+	var TF_PAGES_PLAY_SELECTOR =
+		".Root__main-view .main-actionBar-ActionBarPlayButtonContainer button, " +
+		".Root__main-view .main-actionBar-ActionBarRow [data-testid=\"play-button\"]";
+
+	function tfPagesSchedule() {
+		if (!tfPages.active || tfPages.timer) return;
+		tfPages.timer = setTimeout(function () {
+			tfPages.timer = 0;
+			tfPagesScan();
+		}, 180);
+	}
+
+	function tfPagesScan() {
+		if (!tfPages.active) return;
+		try { tfAnnotateHeaderMeta(); } catch (e) { /* never let a header break the page */ }
+		try { tfAnnotatePlayState(); } catch (e) { /* idem */ }
+	}
+
+	function tfMetaText(el) {
+		return (el.textContent || "").replace(/[•·]/g, " ").replace(/\s+/g, " ").trim();
+	}
+
+	function tfClassifyMetaPiece(el) {
+		var text = tfMetaText(el);
+		if (!text) return "sep";
+		if (el.matches("a[href*=\"/user/\"]") || el.querySelector("a[href*=\"/user/\"], [data-testid=\"creator-link\"]")) return "owner";
+		if (el.matches("a[href*=\"/artist/\"]") || el.querySelector("a[href*=\"/artist/\"]")) return "artist";
+		if (el.matches("a[href*=\"/show/\"]") || el.querySelector("a[href*=\"/show/\"]")) return "show";
+		if (/^\d{4}$/.test(text)) return "year";
+		if (/\d/.test(text) && /(like|save|j.aime|enregistr|sauvegard|guardad|gespeichert|me gusta|mi piace)/i.test(text)) return "saves";
+		if (/\d/.test(text) && /,/.test(text)) return "tracks";
+		if (/^(~|≈|about|environ|ca\.?|unos|circa)?\s*[\d\s:]+(h|hr|hrs|min|s|sec)\b/i.test(text)) return "duration";
+		if (/\d/.test(text)) return "tracks";
+		return "info";
+	}
+
+	function tfAnnotateHeaderMeta() {
+		var metas = document.querySelectorAll(".Root__main-view .main-entityHeader-metaData");
+		for (var i = 0; i < metas.length; i++) {
+			var meta = metas[i];
+			var pieces = meta.children;
+			// Some builds wrap every piece in one extra span; look through it.
+			if (pieces.length === 1 && pieces[0].children.length > 1) pieces = pieces[0].children;
+			var labelled = 0;
+			for (var j = 0; j < pieces.length; j++) {
+				var key = tfClassifyMetaPiece(pieces[j]);
+				if (pieces[j].getAttribute("data-tf-key") !== key) pieces[j].setAttribute("data-tf-key", key);
+				if (key !== "sep") labelled++;
+			}
+			if (labelled) {
+				if (meta.getAttribute("data-tf-meta") !== "1") meta.setAttribute("data-tf-meta", "1");
+			} else {
+				meta.removeAttribute("data-tf-meta");
+			}
+		}
+	}
+
+	// true / false when we know whether this page is the playing context,
+	// null when the route isn't one we can map.
+	function tfPageIsPlayingContext() {
+		var history = Spicetify.Platform && Spicetify.Platform.History;
+		var path = history && history.location && history.location.pathname;
+		if (!path) return null;
+		var data = Spicetify.Player && Spicetify.Player.data;
+		var ctx = (data && ((data.context && data.context.uri) || data.context_uri)) || "";
+		var item = (data && ((data.item && data.item.uri) || (data.track && data.track.uri))) || "";
+		var m = /^\/(playlist|album|artist|show|episode)\/([A-Za-z0-9]+)/.exec(path);
+		if (m) {
+			var uri = "spotify:" + m[1] + ":" + m[2];
+			return m[1] === "episode" ? item === uri : ctx === uri;
+		}
+		if (/^\/collection\/tracks/.test(path)) return /:collection$/.test(ctx);
+		if (/^\/collection\/your-episodes/.test(path)) return /:collection:your-episodes$/.test(ctx);
+		return null;
+	}
+
+	function tfAnnotatePlayState() {
+		var buttons = document.querySelectorAll(TF_PAGES_PLAY_SELECTOR);
+		if (!buttons.length) return;
+		var match = tfPageIsPlayingContext();
+		var data = Spicetify.Player && Spicetify.Player.data;
+		var state = match === null ? "" : (match && data && !data.isPaused ? "pause" : "play");
+		for (var i = 0; i < buttons.length; i++) {
+			if (state) {
+				if (buttons[i].getAttribute("data-tf-state") !== state) buttons[i].setAttribute("data-tf-state", state);
+			} else {
+				buttons[i].removeAttribute("data-tf-state");
+			}
+		}
+	}
+
+	function tfPagesAttachObserver(attemptsLeft) {
+		if (!tfPages.active) return;
+		var root = document.querySelector(".Root__main-view");
+		if (!root) {
+			// The main view mounts after theme.js on a cold start; poll for it
+			// briefly (~20s), same budget as waitFor elsewhere.
+			if (attemptsLeft > 0) {
+				tfPages.rootTimer = setTimeout(function () {
+					tfPages.rootTimer = 0;
+					tfPagesAttachObserver(attemptsLeft - 1);
+				}, 200);
+			}
+			return;
+		}
+		tfPages.observer = new MutationObserver(tfPagesSchedule);
+		tfPages.observer.observe(root, { childList: true, subtree: true });
+		tfPagesScan();
+	}
+
+	function setupFullPages() {
+		if (tfPages.active) return;
+		tfPages.active = true;
+		tfPages.onPlayer = function () { tfPagesSchedule(); };
+		if (Spicetify.Player && Spicetify.Player.addEventListener) {
+			Spicetify.Player.addEventListener("onplaypause", tfPages.onPlayer);
+			Spicetify.Player.addEventListener("songchange", tfPages.onPlayer);
+		}
+		tfPagesAttachObserver(100);
+	}
+
+	function teardownFullPages() {
+		tfPages.active = false;
+		if (tfPages.observer) tfPages.observer.disconnect();
+		tfPages.observer = null;
+		if (tfPages.timer) clearTimeout(tfPages.timer);
+		if (tfPages.rootTimer) clearTimeout(tfPages.rootTimer);
+		tfPages.timer = tfPages.rootTimer = 0;
+		if (tfPages.onPlayer && Spicetify.Player && Spicetify.Player.removeEventListener) {
+			Spicetify.Player.removeEventListener("onplaypause", tfPages.onPlayer);
+			Spicetify.Player.removeEventListener("songchange", tfPages.onPlayer);
+		}
+		tfPages.onPlayer = null;
+		var tagged = document.querySelectorAll("[data-tf-key], [data-tf-meta], [data-tf-state]");
+		for (var i = 0; i < tagged.length; i++) {
+			tagged[i].removeAttribute("data-tf-key");
+			tagged[i].removeAttribute("data-tf-meta");
+			tagged[i].removeAttribute("data-tf-state");
+		}
+	}
+
+	fullConversionParts.push({ setup: setupFullPages, teardown: teardownFullPages });
 	// --- END FULL/PAGES ----------------------------------------------------
 
 	// --- FULL/CHROME: overlays, branding, page tags (agent D) -------------

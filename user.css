@@ -1858,6 +1858,1187 @@ html.terminal-full .Root__nav-bar [data-encore-id="card"]:hover {
 /* --- END FULL/PLAYER ----------------------------------------------------- */
 
 /* --- FULL/PAGES (agent C) ------------------------------------------------ */
+/* Everything inside the main view: home shelves, search/browse, entity
+   headers (playlist/album/artist/show/episode/profile), action bars,
+   tracklists, collection tiles, skeletons, settings. Hooks are, in order of
+   preference, data-testid / data-encore-id / ARIA / Encore tokens, then the
+   mapped main-* / x-* / view-* classes (spicetify rewrites the hashed names
+   to these at apply time). No raw hashes, no path[d] matching.
+   Glyphs that also exist as emoji (▶ ♥ ⏱) carry U+FE0E so a colour emoji
+   font never gets picked as the fallback on Windows/Linux. */
+
+/* ---- 0. Encore colour sets --------------------------------------------
+   Spotify re-declares its colour tokens on nested "set" elements — the
+   green play buttons (.encore-bright-accent-set), white pills
+   (.encore-inverted-light-set) and plain surfaces (.encore-base-set). A
+   :root !important override does not reach those: a custom property set
+   directly on an element beats the inherited one. Re-declaring them here
+   is what removes the last Spotify greens. Inverted = terminal inverse
+   video (light text colour as background), bright accent = our one teal. */
+html.terminal-full .encore-base-set,
+html.terminal-full .encore-dark-theme .encore-base-set {
+  --background-base: var(--term-bg) !important;
+  --background-highlight: var(--term-bg-hi) !important;
+  --background-press: var(--term-bg-press) !important;
+  --background-elevated-base: var(--term-bg-elevated) !important;
+  --background-elevated-highlight: var(--term-bg-elevated-hi) !important;
+  --background-elevated-press: var(--term-bg-press) !important;
+  --background-tinted-base: var(--term-bg-tinted) !important;
+  --background-tinted-highlight: var(--term-bg-tinted-hi) !important;
+  --background-tinted-press: var(--term-bg-tinted-press) !important;
+  --text-base: var(--term-text) !important;
+  --text-subdued: var(--term-subdued) !important;
+  --text-bright-accent: var(--term-green) !important;
+  --text-positive: var(--term-green) !important;
+  --essential-base: var(--term-text) !important;
+  --essential-subdued: var(--term-subdued) !important;
+  --essential-bright-accent: var(--term-green) !important;
+  --essential-positive: var(--term-green) !important;
+  --decorative-base: var(--term-text) !important;
+  --decorative-subdued: var(--term-border) !important;
+}
+
+html.terminal-full .encore-bright-accent-set,
+html.terminal-full .encore-dark-theme .encore-bright-accent-set {
+  --background-base: var(--term-green) !important;
+  --background-highlight: var(--term-green) !important;
+  --background-press: var(--term-green-dim) !important;
+  --background-elevated-base: var(--term-green) !important;
+  --background-elevated-highlight: var(--term-green) !important;
+  --background-elevated-press: var(--term-green-dim) !important;
+  --text-base: var(--term-bg) !important;
+  --text-subdued: var(--term-bg-elevated) !important;
+  --text-bright-accent: var(--term-green) !important;
+  --essential-base: var(--term-bg) !important;
+  --essential-subdued: var(--term-bg-elevated) !important;
+  --essential-bright-accent: var(--term-green) !important;
+}
+
+html.terminal-full .encore-inverted-light-set,
+html.terminal-full .encore-dark-theme .encore-inverted-light-set {
+  --background-base: var(--term-text) !important;
+  --background-highlight: var(--term-green) !important;
+  --background-press: var(--term-green-dim) !important;
+  --text-base: var(--term-bg) !important;
+  --text-subdued: var(--term-bg-elevated) !important;
+  --text-bright-accent: var(--term-green-dim) !important;
+  --essential-base: var(--term-bg) !important;
+  --essential-subdued: var(--term-bg-elevated) !important;
+  --essential-bright-accent: var(--term-green-dim) !important;
+}
+
+/* ---- 1. Shape reset for the whole main view ---------------------------
+   Square everything: covers, artist avatars (profile + artist cards),
+   chips, buttons, inputs, tiles. One broad rule instead of a whitelist,
+   because every "rounded" surface in there is a Spotify tell. */
+html.terminal-full .Root__main-view,
+html.terminal-full .Root__main-view *,
+html.terminal-full .Root__main-view *::before,
+html.terminal-full .Root__main-view *::after {
+  border-radius: 0 !important;
+}
+
+/* Covers get a flat 1px frame instead of Spotify's soft drop shadow. */
+html.terminal-full .Root__main-view :is(.main-card-imageContainer, .main-entityHeader-imageContainer, .x-entityImage-imageContainer, .view-homeShortcutsGrid-imageContainer) {
+  box-shadow: none !important;
+}
+
+html.terminal-full .Root__main-view .main-card-imageContainer :is(img, [class*="cardImage"]) {
+  box-shadow: none !important;
+}
+
+/* Page footer: Spotify company links + "© Spotify AB". Pure branding. */
+html.terminal-full .main-page-footerContainer,
+html.terminal-full .main-page-footerSectionWrapper {
+  display: none !important;
+}
+
+/* ---- 2. Home ---------------------------------------------------------- */
+/* Home header carries a colour wash picked from the recent shortcuts. */
+html.terminal-full .main-home-homeHeader {
+  background: none !important;
+  background-color: transparent !important;
+}
+
+/* Filter chips (All / Music / Podcasts, and the search result filters):
+   bracket tabs. The sticky strip they sit on becomes a flat bar with a
+   1px rule under it. */
+html.terminal-full .main-home-filterChipsSection {
+  background-color: var(--term-bg) !important;
+  box-shadow: none !important;
+  border-bottom: 1px solid var(--term-border);
+}
+
+html.terminal-full .main-home-filterChipsSection::after {
+  display: none !important;
+}
+
+html.terminal-full .Root__main-view :is(button, a, [role="checkbox"], [role="tab"]):has(> [class*="ChipInnerComponent"]) {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html.terminal-full .Root__main-view [class*="ChipInnerComponent"] {
+  background: transparent !important;
+  color: var(--term-subdued) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  min-block-size: 32px;
+  padding-inline: 4px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0 !important;
+  transition: color var(--tf-fast) var(--tf-ease), background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view [class*="ChipInnerComponent"]::before {
+  content: "[ ";
+  white-space: pre;
+  color: var(--term-border);
+  transition: color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view [class*="ChipInnerComponent"]::after {
+  content: " ]";
+  white-space: pre;
+  color: var(--term-border);
+  transition: color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view :hover > [class*="ChipInnerComponent"],
+html.terminal-full .Root__main-view [class*="ChipInnerComponent"]:hover {
+  color: var(--term-text) !important;
+}
+
+html.terminal-full .Root__main-view :hover > [class*="ChipInnerComponent"]::before,
+html.terminal-full .Root__main-view :hover > [class*="ChipInnerComponent"]::after,
+html.terminal-full .Root__main-view [class*="ChipInnerComponent"]:hover::before,
+html.terminal-full .Root__main-view [class*="ChipInnerComponent"]:hover::after {
+  color: var(--term-green);
+}
+
+/* Selected tab: inverse video, the terminal way of saying "active". */
+html.terminal-full .Root__main-view [class*="ChipInnerComponent"][class*="selected"],
+html.terminal-full .Root__main-view [aria-checked="true"] > [class*="ChipInnerComponent"],
+html.terminal-full .Root__main-view [aria-selected="true"] > [class*="ChipInnerComponent"] {
+  background: var(--term-green) !important;
+  color: var(--term-bg) !important;
+  font-weight: 700 !important;
+}
+
+html.terminal-full .Root__main-view [class*="ChipInnerComponent"][class*="selected"]::before,
+html.terminal-full .Root__main-view [class*="ChipInnerComponent"][class*="selected"]::after,
+html.terminal-full .Root__main-view [aria-checked="true"] > [class*="ChipInnerComponent"]::before,
+html.terminal-full .Root__main-view [aria-checked="true"] > [class*="ChipInnerComponent"]::after,
+html.terminal-full .Root__main-view [aria-selected="true"] > [class*="ChipInnerComponent"]::before,
+html.terminal-full .Root__main-view [aria-selected="true"] > [class*="ChipInnerComponent"]::after {
+  color: var(--term-bg);
+}
+
+/* Recent shortcuts grid: compact table. The 1px grid gap over a border
+   coloured background draws the table rules; each cell is one row
+   (tiny cover, name). A prompt line labels the block. */
+html.terminal-full .view-homeShortcutsGrid-shortcuts::before {
+  content: "$ ls -t ~/récents";
+  display: block;
+  margin-block-end: 8px;
+  font-size: 12px;
+  color: var(--term-subdued);
+}
+
+html.terminal-full .view-homeShortcutsGrid-grid {
+  gap: 1px !important;
+  background-color: var(--term-border);
+  border: 1px solid var(--term-border);
+}
+
+html.terminal-full .view-homeShortcutsGrid-shortcut,
+html.terminal-full .view-homeShortcutsGrid-draggable {
+  background-color: var(--term-bg) !important;
+  box-shadow: none !important;
+}
+
+html.terminal-full .view-homeShortcutsGrid-shortcut {
+  position: relative;
+  transition: background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .view-homeShortcutsGrid-shortcut:hover,
+html.terminal-full .view-homeShortcutsGrid-shortcut:focus-within {
+  background-color: var(--term-bg-elevated-hi) !important;
+  box-shadow: inset 2px 0 0 var(--term-green) !important;
+}
+
+html.terminal-full .view-homeShortcutsGrid-name {
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0 !important;
+}
+
+html.terminal-full .view-homeShortcutsGrid-shortcut:hover .view-homeShortcutsGrid-name {
+  color: var(--term-green) !important;
+}
+
+/* Liked-songs "equaliser" GIF in the shortcut → a steady ▶ in our teal. */
+html.terminal-full .Root__main-view :is(.view-homeShortcutsGrid-equaliser, .view-homeShortcutsGrid-equaliserImage, .view-homeShortcutsGrid-playingIcon, .main-trackList-playingIcon, img[src*="equaliser"]) {
+  display: none !important;
+}
+
+html.terminal-full .Root__main-view :is(.main-trackList-trackListRow, .view-homeShortcutsGrid-shortcut) :has(> :is(.view-homeShortcutsGrid-equaliser, .view-homeShortcutsGrid-equaliserImage, .main-trackList-playingIcon, img[src*="equaliser"]))::before {
+  content: "▶\FE0E";
+  color: var(--term-green);
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* Shelves: `$ ls ~/<shelf>` headings, "Show all" as [+more]. Search
+   result sections and the browse grid heading use the same treatment so
+   every listing in the app reads alike. */
+html.terminal-full .Root__main-view :is(.main-shelf-title, .search-searchBrowse-SearchBrowse h2, #searchPage section > h2) {
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  text-transform: lowercase;
+  line-height: 1.4 !important;
+}
+
+html.terminal-full .Root__main-view :is(.main-shelf-title, .search-searchBrowse-SearchBrowse h2, #searchPage section > h2)::before {
+  content: "$ ls ~/";
+  color: var(--term-green);
+  font-weight: 400;
+}
+
+html.terminal-full .Root__main-view .main-shelf-title a {
+  color: inherit !important;
+  text-decoration: none !important;
+  background-image: linear-gradient(var(--term-green), var(--term-green));
+  background-size: 0% 1px;
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+}
+
+html.terminal-full .Root__main-view .main-shelf-title a:hover {
+  background-size: 100% 1px;
+}
+
+html.terminal-full .Root__main-view .main-shelf-subHeader,
+html.terminal-full .Root__main-view .main-shelf-subHeader * {
+  font-size: 11px !important;
+  color: var(--term-subdued) !important;
+  text-transform: none;
+}
+
+html.terminal-full .Root__main-view .main-shelf-subHeader::before {
+  content: "# ";
+  color: var(--term-border);
+}
+
+/* The native text keeps its accessible name (font-size:0, not display:none);
+   the visible label is drawn by ::after. */
+html.terminal-full .Root__main-view :is(.main-shelf-seeAll, .main-seeAll-link, .search-recentSearches-seeAll),
+html.terminal-full .Root__main-view :is(.main-shelf-seeAll, .main-seeAll-link, .search-recentSearches-seeAll) * {
+  font-size: 0 !important;
+  text-decoration: none !important;
+}
+
+html.terminal-full .Root__main-view :is(.main-shelf-seeAll, .main-seeAll-link, .search-recentSearches-seeAll) {
+  display: inline-flex !important;
+  align-items: center;
+  min-block-size: 32px;
+  padding-inline: 4px;
+}
+
+html.terminal-full .Root__main-view :is(.main-shelf-seeAll, .main-seeAll-link, .search-recentSearches-seeAll)::after {
+  content: "[+more]";
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--term-subdued);
+  transition: color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view :is(.main-shelf-seeAll, .main-seeAll-link, .search-recentSearches-seeAll):hover::after {
+  color: var(--term-green);
+}
+
+html.terminal-full .Root__main-view .main-shelf-shelf + .main-shelf-shelf,
+html.terminal-full .Root__main-view .main-shelf-section + .main-shelf-section {
+  border-top: 1px dashed var(--term-border);
+  padding-top: 12px;
+}
+
+/* ---- 3. Cards --------------------------------------------------------
+   Square file boxes: flat tinted fill, 1px frame, mono title. Hover:
+   frame turns teal, the title flips to inverse video with a left-to-right
+   sweep, and a single scan line runs down the cover. No lift, no glow. */
+html.terminal-full .Root__main-view :is(.main-card-card, .main-heroCard-card, [data-testid="top-result-card"]) {
+  background: var(--term-bg-tinted) !important;
+  border: 1px solid var(--term-border) !important;
+  box-shadow: none !important;
+  transform: none !important;
+  transition: border-color var(--tf-fast) var(--tf-ease), background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view :is(.main-card-card, .main-heroCard-card, [data-testid="top-result-card"]):hover,
+html.terminal-full .Root__main-view :is(.main-card-card, .main-heroCard-card, [data-testid="top-result-card"]):focus-within {
+  background: var(--term-bg-elevated) !important;
+  border-color: var(--term-green) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+/* Spotify paints its own hover wash with a pseudo-element on the card. */
+html.terminal-full .Root__main-view .main-card-card::after {
+  background: none !important;
+}
+
+html.terminal-full .Root__main-view .main-card-card .main-card-imageContainer {
+  position: relative;
+  overflow: hidden;
+  outline: 1px solid var(--term-border);
+}
+
+html.terminal-full .Root__main-view .main-card-card .main-card-imageContainer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent 0 94%, var(--term-green) 94% 96%, transparent 96%);
+  opacity: 0;
+}
+
+html.terminal-full .Root__main-view .main-card-card:hover .main-card-imageContainer::after {
+  animation: tf-card-scan var(--tf-slow) var(--tf-ease);
+}
+
+@keyframes tf-card-scan {
+  from { opacity: 1; transform: translateY(-100%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+html.terminal-full .Root__main-view :is(.main-card-cardTitle, .main-card-cardTitleLink) {
+  position: relative;
+  isolation: isolate;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  transition: color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view .main-card-cardTitle::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--term-green);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--tf-med) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view .main-card-card:hover .main-card-cardTitle::before {
+  transform: scaleX(1);
+}
+
+html.terminal-full .Root__main-view .main-card-card:hover :is(.main-card-cardTitle, .main-card-cardTitle *) {
+  color: var(--term-bg) !important;
+}
+
+html.terminal-full .Root__main-view .main-card-cardMetadata,
+html.terminal-full .Root__main-view .main-card-cardMetadata * {
+  font-size: 12px !important;
+  color: var(--term-subdued) !important;
+}
+
+/* First item of each shelf: the "newest file" of the listing — teal frame
+   and a ▸ marker before its title. Same box size, so the grid is intact. */
+html.terminal-full .Root__main-view :is(.main-shelf-shelfGrid, .main-gridContainer-gridContainer) > :first-child .main-card-card,
+html.terminal-full .Root__main-view :is(.main-shelf-shelfGrid, .main-gridContainer-gridContainer) > .main-card-card:first-child {
+  border-color: var(--term-green-dim) !important;
+  background: var(--term-bg-elevated) !important;
+}
+
+html.terminal-full .Root__main-view :is(.main-shelf-shelfGrid, .main-gridContainer-gridContainer) > :first-child .main-card-card .main-card-imageContainer::before,
+html.terminal-full .Root__main-view :is(.main-shelf-shelfGrid, .main-gridContainer-gridContainer) > .main-card-card:first-child .main-card-imageContainer::before {
+  content: "▸ 01";
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--term-green);
+  color: var(--term-bg);
+  pointer-events: none;
+}
+
+/* Hover play button on cards / shortcuts / hero cards: a square [▶].
+   The native SVG stays (it is what flips between play and pause), just
+   tinted teal and flanked by brackets. */
+html.terminal-full .Root__main-view :is(.main-card-PlayButtonContainer, .view-homeShortcutsGrid-PlayButtonContainer, .main-heroCard-PlayButtonContainer) {
+  box-shadow: none !important;
+}
+
+html.terminal-full .Root__main-view :is(.main-card-PlayButtonContainer, .view-homeShortcutsGrid-PlayButtonContainer, .main-heroCard-PlayButtonContainer) button {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  inline-size: auto !important;
+  min-inline-size: 40px;
+  block-size: 32px !important;
+  padding: 0 6px !important;
+  background: var(--term-bg) !important;
+  border: 1px solid var(--term-green) !important;
+  color: var(--term-green) !important;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45) !important;
+  font-size: 13px;
+  transform: none !important;
+  transition: background-color var(--tf-fast) var(--tf-ease), color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view :is(.main-card-PlayButtonContainer, .view-homeShortcutsGrid-PlayButtonContainer, .main-heroCard-PlayButtonContainer) button::before {
+  content: "[";
+}
+
+html.terminal-full .Root__main-view :is(.main-card-PlayButtonContainer, .view-homeShortcutsGrid-PlayButtonContainer, .main-heroCard-PlayButtonContainer) button::after {
+  content: "]";
+}
+
+html.terminal-full .Root__main-view :is(.main-card-PlayButtonContainer, .view-homeShortcutsGrid-PlayButtonContainer, .main-heroCard-PlayButtonContainer) button > span {
+  background: transparent !important;
+  color: inherit !important;
+  inline-size: auto !important;
+  block-size: auto !important;
+  min-block-size: 0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+html.terminal-full .Root__main-view :is(.main-card-PlayButtonContainer, .view-homeShortcutsGrid-PlayButtonContainer, .main-heroCard-PlayButtonContainer) button svg {
+  inline-size: 12px !important;
+  block-size: 12px !important;
+  fill: currentColor !important;
+  color: inherit !important;
+}
+
+html.terminal-full .Root__main-view :is(.main-card-PlayButtonContainer, .view-homeShortcutsGrid-PlayButtonContainer, .main-heroCard-PlayButtonContainer) button:hover {
+  background: var(--term-green) !important;
+  color: var(--term-bg) !important;
+}
+
+/* ---- 4. Search / browse ---------------------------------------------
+   Genre tiles: Spotify paints each tile with a vivid inline
+   background-color plus a rotated cover. We keep that colour only as a
+   4px left bar (a background-image drawn over the inline colour, which it
+   cannot beat otherwise) and drop the rotated art: a monochrome box with
+   a mono label and a `cd ›` hint on hover. */
+html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="heroCategoryCard-HeroCategoryCard"]) {
+  background-image: linear-gradient(90deg, transparent 0 4px, var(--term-bg-tinted) 4px) !important;
+  border: 1px solid var(--term-border) !important;
+  box-shadow: none !important;
+  position: relative;
+  overflow: hidden;
+  transform: none !important;
+  transition: border-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="heroCategoryCard-HeroCategoryCard"]):hover,
+html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="heroCategoryCard-HeroCategoryCard"]):focus-visible {
+  border-color: var(--term-green) !important;
+}
+
+/* The cover stays as a small, straight, greyscale thumbnail in the
+   corner — texture without the vivid rotated sticker. */
+html.terminal-full .Root__main-view :is(.x-categoryCard-image, [class*="heroCategoryCard-image"]) {
+  inset: auto 10px 10px auto !important;
+  inline-size: 30% !important;
+  block-size: auto !important;
+  aspect-ratio: 1;
+  transform: none !important;
+  filter: grayscale(1) contrast(1.1);
+  opacity: 0.3;
+  box-shadow: none !important;
+  outline: 1px solid var(--term-border);
+  transition: opacity var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="heroCategoryCard-HeroCategoryCard"]):hover :is(.x-categoryCard-image, [class*="heroCategoryCard-image"]) {
+  opacity: 0.6;
+}
+
+html.terminal-full .Root__main-view :is(.x-categoryCard-title, [class*="heroCategoryCard-heroTitle"]) {
+  color: var(--term-text) !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  line-height: 1.35 !important;
+  isolation: isolate;
+  padding-inline: 2px;
+}
+
+html.terminal-full .Root__main-view :is(.x-categoryCard-title, [class*="heroCategoryCard-heroTitle"])::before {
+  content: "~/";
+  color: var(--term-subdued);
+  font-weight: 400;
+}
+
+html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="heroCategoryCard-HeroCategoryCard"])::after {
+  content: "cd ›";
+  position: absolute;
+  left: 16px;
+  bottom: 10px;
+  font-size: 12px;
+  color: var(--term-green);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity var(--tf-fast) var(--tf-ease), transform var(--tf-fast) var(--tf-ease);
+  pointer-events: none;
+}
+
+html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="heroCategoryCard-HeroCategoryCard"]):hover::after {
+  opacity: 1;
+  transform: none;
+}
+
+html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="heroCategoryCard-HeroCategoryCard"]):hover :is(.x-categoryCard-title, [class*="heroCategoryCard-heroTitle"]) {
+  color: var(--term-green) !important;
+}
+
+/* ---- 5. Entity headers (playlist, album, artist, show, episode,
+   profile) -------------------------------------------------------------
+   No wash (already flattened in the base theme), a 1px rule under the
+   block, framed cover, a big mono title with a prompt and a blinking block
+   cursor, revealed once by a steps() "typing" mask. Metadata become
+   `key: value` lines — theme.js tags each native piece with data-tf-key
+   and sets data-tf-meta on the container only once that worked, so the
+   layout never changes when the script can't classify the header. */
+html.terminal-full .Root__main-view .main-entityHeader-container {
+  border-bottom: 1px solid var(--term-border);
+}
+
+html.terminal-full .Root__main-view .main-entityHeader-imageContainer {
+  outline: 1px solid var(--term-border);
+  outline-offset: 3px;
+}
+
+html.terminal-full .Root__main-view .main-entityHeader-pretitle,
+html.terminal-full .Root__main-view .main-entityHeader-pretitle * {
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  text-transform: lowercase !important;
+  letter-spacing: 0 !important;
+  color: var(--term-subdued) !important;
+}
+
+html.terminal-full .Root__main-view .main-entityHeader-pretitle::before {
+  content: "# ";
+  color: var(--term-green-dim);
+}
+
+html.terminal-full .Root__main-view .main-entityHeader-title {
+  position: relative;
+  overflow: hidden;
+}
+
+html.terminal-full .Root__main-view .main-entityHeader-title :is(h1, h2) {
+  font-size: clamp(28px, 4.4vw, 60px) !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em !important;
+  line-height: 1.12 !important;
+  color: var(--term-text) !important;
+}
+
+html.terminal-full .Root__main-view .main-entityHeader-title :is(h1, h2)::before {
+  content: "> ";
+  color: var(--term-green);
+  font-weight: 400;
+}
+
+html.terminal-full .Root__main-view .main-entityHeader-title :is(h1, h2)::after {
+  content: "▋";
+  margin-left: 0.08em;
+  color: var(--term-green);
+  font-weight: 400;
+  animation: term-blink 1s step-end infinite;
+}
+
+/* The typing reveal: an opaque strip in the page colour slides off the
+   title in 18 discrete steps. It is invisible at rest (opacity 0), so if
+   the animation is skipped (reduced motion) nothing stays covered. */
+html.terminal-full .Root__main-view .main-entityHeader-title::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--term-bg);
+  pointer-events: none;
+  opacity: 0;
+  animation: tf-title-type var(--tf-slow) steps(18, end) 1;
+}
+
+@keyframes tf-title-type {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 1; transform: translateX(100%); }
+}
+
+html.terminal-full .Root__main-view .main-entityHeader-metaData[data-tf-meta] {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  flex-wrap: nowrap !important;
+  gap: 1px;
+  margin-top: 8px;
+  font-size: 13px !important;
+}
+
+html.terminal-full .Root__main-view .main-entityHeader-metaData[data-tf-meta] > [data-tf-key],
+html.terminal-full .Root__main-view .main-entityHeader-metaData[data-tf-meta] > * > [data-tf-key] {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  margin: 0 !important;
+  line-height: 1.6;
+}
+
+html.terminal-full .Root__main-view [data-tf-key]::before {
+  content: attr(data-tf-key) ":" !important;
+  display: inline-block;
+  min-inline-size: 8ch;
+  margin: 0 !important;
+  color: var(--term-subdued);
+  font-weight: 400;
+  opacity: 1 !important;
+}
+
+html.terminal-full .Root__main-view [data-tf-key="sep"] {
+  display: none !important;
+}
+
+html.terminal-full .Root__main-view .main-entityHeader-metaData[data-tf-meta] :is(.main-avatar-avatar, img) {
+  inline-size: 18px !important;
+  block-size: 18px !important;
+}
+
+html.terminal-full .Root__main-view .playlist-playlist-playlistDescription {
+  color: var(--term-subdued) !important;
+}
+
+html.terminal-full .Root__main-view .playlist-playlist-playlistDescription::before {
+  content: "// ";
+  color: var(--term-border);
+}
+
+/* ---- 6. Action bar --------------------------------------------------
+   Play: `[ ▶ lire ]` — square, teal frame, inverse on hover. The native
+   icon stays (it already flips play/pause); the word comes from
+   data-tf-state, set by theme.js from the player context, with a neutral
+   "lecture" when it can't tell. Shuffle / save / download / more: framed
+   glyph buttons with a short visible label; native aria-labels and
+   tooltips are untouched. */
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow {
+  gap: 8px;
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarPlayButtonContainer {
+  box-shadow: none !important;
+}
+
+html.terminal-full .Root__main-view :is(.main-actionBar-ActionBarPlayButtonContainer button, .main-actionBar-ActionBarRow [data-testid="play-button"]) {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  inline-size: auto !important;
+  block-size: 40px !important;
+  min-inline-size: 0 !important;
+  padding: 0 14px !important;
+  background: var(--term-bg) !important;
+  border: 1px solid var(--term-green) !important;
+  color: var(--term-green) !important;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45) !important;
+  font-size: 14px !important;
+  font-weight: 700;
+  transform: none !important;
+  transition: background-color var(--tf-fast) var(--tf-ease), color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view :is(.main-actionBar-ActionBarPlayButtonContainer button, .main-actionBar-ActionBarRow [data-testid="play-button"])::before {
+  content: "[";
+}
+
+html.terminal-full .Root__main-view :is(.main-actionBar-ActionBarPlayButtonContainer button, .main-actionBar-ActionBarRow [data-testid="play-button"])::after {
+  content: "lecture ]";
+  white-space: pre;
+}
+
+html.terminal-full .Root__main-view :is(.main-actionBar-ActionBarPlayButtonContainer button, .main-actionBar-ActionBarRow [data-testid="play-button"])[data-tf-state="play"]::after {
+  content: "lire ]";
+}
+
+html.terminal-full .Root__main-view :is(.main-actionBar-ActionBarPlayButtonContainer button, .main-actionBar-ActionBarRow [data-testid="play-button"])[data-tf-state="pause"]::after {
+  content: "pause ]";
+}
+
+html.terminal-full .Root__main-view :is(.main-actionBar-ActionBarPlayButtonContainer button, .main-actionBar-ActionBarRow [data-testid="play-button"]) > span {
+  background: transparent !important;
+  color: inherit !important;
+  inline-size: auto !important;
+  block-size: auto !important;
+  min-block-size: 0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+html.terminal-full .Root__main-view :is(.main-actionBar-ActionBarPlayButtonContainer button, .main-actionBar-ActionBarRow [data-testid="play-button"]) svg {
+  inline-size: 14px !important;
+  block-size: 14px !important;
+  fill: currentColor !important;
+}
+
+html.terminal-full .Root__main-view :is(.main-actionBar-ActionBarPlayButtonContainer button, .main-actionBar-ActionBarRow [data-testid="play-button"]):hover {
+  background: var(--term-green) !important;
+  color: var(--term-bg) !important;
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-actionBar-shuffleButton, [data-testid="shuffle-button"], .main-addButton-button, [data-testid="add-button"], .main-moreButton-button, [data-testid="more-button"], .x-downloadButton-button, [data-testid="download-button"], .artist-followButton-button) {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  inline-size: auto !important;
+  min-inline-size: 32px;
+  block-size: 32px !important;
+  padding: 0 10px !important;
+  background: transparent !important;
+  border: 1px solid var(--term-border) !important;
+  color: var(--term-subdued) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+  transition: border-color var(--tf-fast) var(--tf-ease), color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-actionBar-shuffleButton, [data-testid="shuffle-button"], .main-addButton-button, [data-testid="add-button"], .main-moreButton-button, [data-testid="more-button"], .x-downloadButton-button, [data-testid="download-button"], .artist-followButton-button):hover {
+  border-color: var(--term-green) !important;
+  color: var(--term-text) !important;
+}
+
+/* Glyph buttons: the Spotify icon is replaced, not kept. */
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-actionBar-shuffleButton, [data-testid="shuffle-button"], .main-addButton-button, [data-testid="add-button"], .main-moreButton-button, [data-testid="more-button"]) > * {
+  display: none !important;
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-actionBar-shuffleButton, [data-testid="shuffle-button"])::before {
+  content: "⤮";
+  font-size: 15px;
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-actionBar-shuffleButton, [data-testid="shuffle-button"])::after {
+  content: "aléatoire";
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-addButton-button, [data-testid="add-button"])::before {
+  content: "＋";
+  font-size: 14px;
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-addButton-button, [data-testid="add-button"])::after {
+  content: "enregistrer";
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-moreButton-button, [data-testid="more-button"])::before {
+  content: "⋯";
+  font-size: 15px;
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-moreButton-button, [data-testid="more-button"])::after {
+  content: "plus";
+}
+
+/* Download keeps its SVG (it carries the progress ring and done state);
+   the label is its own localized aria-label, clipped to stay short. */
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.x-downloadButton-button, [data-testid="download-button"]) svg {
+  inline-size: 14px !important;
+  block-size: 14px !important;
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.x-downloadButton-button, [data-testid="download-button"])[aria-label]::after {
+  content: attr(aria-label);
+  display: inline-block;
+  max-inline-size: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: lowercase;
+}
+
+/* On states: shuffle on, saved to library, following. */
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-actionBar-shuffleButton, [data-testid="shuffle-button"], .main-addButton-button, [data-testid="add-button"]):is([aria-checked="true"], [aria-pressed="true"], .main-addButton-active),
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow .artist-followButton-followed {
+  color: var(--term-green) !important;
+  border-color: var(--term-green-dim) !important;
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-addButton-button, [data-testid="add-button"]):is([aria-checked="true"], .main-addButton-active)::before {
+  content: "♥\FE0E";
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-addButton-button, [data-testid="add-button"]):is([aria-checked="true"], .main-addButton-active)::after {
+  content: "enregistré";
+}
+
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(.main-actionBar-shuffleButton, [data-testid="shuffle-button"]):is([aria-checked="true"], [aria-pressed="true"])::after {
+  content: "aléatoire: on";
+}
+
+/* ---- 7. Tracklists: `ls -l` --------------------------------------------
+   Uppercase dim header row with a rule under it, mono rows with tabular
+   digits, zebra shading from the stable aria-rowindex (works with the
+   virtualized list, where nth-child does not), a lifted hover, teal ▶ +
+   teal title for the playing row (the equaliser GIF is hidden above),
+   [E] badges, ♥/＋ glyphs, and the first rows fading in one after the
+   other (max 8 rows, 20ms apart). */
+html.terminal-full .Root__main-view .main-trackList-trackListHeader,
+html.terminal-full .Root__main-view .main-trackList-trackListHeaderStuck {
+  background-color: var(--term-bg) !important;
+  box-shadow: none !important;
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListHeaderRow {
+  border-bottom: 1px solid var(--term-border) !important;
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListHeaderRow [role="columnheader"],
+html.terminal-full .Root__main-view .main-trackList-trackListHeaderRow [role="columnheader"] * {
+  text-transform: uppercase;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.08em !important;
+  color: var(--term-subdued) !important;
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListHeaderRow [role="columnheader"]:last-child svg {
+  display: none !important;
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListHeaderRow [role="columnheader"]:last-child:has(svg)::after {
+  content: "⏱\FE0E";
+  font-size: 13px;
+  color: var(--term-subdued);
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow {
+  font-variant-numeric: tabular-nums;
+  transition: background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .Root__main-view .main-trackList-rowMainContentTitle,
+html.terminal-full .Root__main-view .main-trackList-rowTitle {
+  font-size: 14px !important;
+  letter-spacing: 0 !important;
+}
+
+html.terminal-full .Root__main-view :is([aria-rowindex$="1"], [aria-rowindex$="3"], [aria-rowindex$="5"], [aria-rowindex$="7"], [aria-rowindex$="9"]) > .main-trackList-trackListRow {
+  background-color: var(--term-bg-tinted);
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow:hover,
+html.terminal-full .Root__main-view .main-trackList-trackListRow:focus-within {
+  background-color: color-mix(in srgb, var(--term-text) 9%, var(--term-bg)) !important;
+  box-shadow: inset 2px 0 0 var(--term-subdued) !important;
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow:hover .main-trackList-rowMainContentTitle {
+  color: var(--term-text) !important;
+}
+
+html.terminal-full .Root__main-view :is(.main-trackList-selected, [aria-selected="true"] > .main-trackList-trackListRow) {
+  background-color: color-mix(in srgb, var(--term-green) 16%, var(--term-bg)) !important;
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow:is(.main-trackList-active, :has(.main-trackList-playingIcon), :has(img[src*="equaliser"]), :has([data-playing-indicator])) {
+  background-color: color-mix(in srgb, var(--term-green) 9%, var(--term-bg)) !important;
+  box-shadow: inset 2px 0 0 var(--term-green) !important;
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow:is(.main-trackList-active, :has(.main-trackList-playingIcon), :has(img[src*="equaliser"]), :has([data-playing-indicator])) :is(.main-trackList-rowMainContentTitle, .main-trackList-rowTitle, .main-trackList-number) {
+  color: var(--term-green) !important;
+}
+
+html.terminal-full .Root__main-view :is(.main-trackList-rowImagePlayButton, .main-trackList-rowImagePlayPauseButton, .main-trackList-rowMarker button) svg {
+  fill: var(--term-green) !important;
+  color: var(--term-green) !important;
+}
+
+/* Explicit and other row badges: plain [E] text, no filled chip. */
+html.terminal-full .Root__main-view :is(.main-trackList-trackListRow .main-tag-container, .x-explicit-label) {
+  background: transparent !important;
+  color: var(--term-subdued) !important;
+  padding: 0 !important;
+  min-inline-size: 0 !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+}
+
+html.terminal-full .Root__main-view :is(.main-trackList-trackListRow .main-tag-container, .x-explicit-label)::before {
+  content: "[";
+}
+
+html.terminal-full .Root__main-view :is(.main-trackList-trackListRow .main-tag-container, .x-explicit-label)::after {
+  content: "]";
+}
+
+/* Row heart / add and "more": glyphs. The native button (and its
+   show-on-hover behaviour, aria-label and tooltip) is untouched. */
+html.terminal-full .Root__main-view .main-trackList-trackListRow :is(.main-trackList-rowHeartButton, .main-addButton-button, [data-testid="add-button"], .main-trackList-rowMoreButton) > * {
+  display: none !important;
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow :is(.main-trackList-rowHeartButton, .main-addButton-button, [data-testid="add-button"]) {
+  color: var(--term-subdued) !important;
+  font-size: 14px;
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow :is(.main-trackList-rowHeartButton, .main-addButton-button, [data-testid="add-button"])::before {
+  content: "＋";
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow :is(.main-trackList-rowHeartButton, .main-addButton-button, [data-testid="add-button"]):is([aria-checked="true"], .main-addButton-active) {
+  color: var(--term-green) !important;
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow :is(.main-trackList-rowHeartButton, .main-addButton-button, [data-testid="add-button"]):is([aria-checked="true"], .main-addButton-active)::before {
+  content: "♥\FE0E";
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-trackList-rowMoreButton {
+  color: var(--term-subdued) !important;
+  font-size: 15px;
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow .main-trackList-rowMoreButton::before {
+  content: "⋯";
+}
+
+html.terminal-full .Root__main-view :is([aria-rowindex="2"], [aria-rowindex="3"], [aria-rowindex="4"], [aria-rowindex="5"], [aria-rowindex="6"], [aria-rowindex="7"], [aria-rowindex="8"], [aria-rowindex="9"]) > .main-trackList-trackListRow {
+  animation: tf-row-in var(--tf-med) var(--tf-ease) backwards;
+}
+
+html.terminal-full .Root__main-view [aria-rowindex="3"] > .main-trackList-trackListRow { animation-delay: 20ms; }
+html.terminal-full .Root__main-view [aria-rowindex="4"] > .main-trackList-trackListRow { animation-delay: 40ms; }
+html.terminal-full .Root__main-view [aria-rowindex="5"] > .main-trackList-trackListRow { animation-delay: 60ms; }
+html.terminal-full .Root__main-view [aria-rowindex="6"] > .main-trackList-trackListRow { animation-delay: 80ms; }
+html.terminal-full .Root__main-view [aria-rowindex="7"] > .main-trackList-trackListRow { animation-delay: 100ms; }
+html.terminal-full .Root__main-view [aria-rowindex="8"] > .main-trackList-trackListRow { animation-delay: 120ms; }
+html.terminal-full .Root__main-view [aria-rowindex="9"] > .main-trackList-trackListRow { animation-delay: 140ms; }
+
+@keyframes tf-row-in {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Vim cursor (j/k): must stay the strongest row state — above hover,
+   zebra and "playing" — so the keyboard position is never ambiguous. */
+html.terminal-full .Root__main-view .main-trackList-trackListRow.terminal-vim-cursor {
+  outline: 1px solid var(--term-green) !important;
+  outline-offset: -1px;
+  background-color: color-mix(in srgb, var(--term-green) 20%, var(--term-bg)) !important;
+  box-shadow: inset 4px 0 0 var(--term-green) !important;
+}
+
+html.terminal-full .Root__main-view .main-trackList-trackListRow.terminal-vim-cursor .main-trackList-rowMainContentTitle {
+  color: var(--term-text) !important;
+}
+
+/* ---- 8. Collection tiles (Liked Songs / Your Episodes) ----------------
+   Spotify's own purple-gradient and green-bookmark art → neutral grey
+   tiles; the big Liked Songs hero card on /collection loses its gradient. */
+html.terminal-full .Root__main-view img:is([src*="liked-songs"], [src*="your-episodes"], [src*="yourEpisodes"]) {
+  filter: grayscale(1) brightness(0.55) contrast(1.35) !important;
+}
+
+html.terminal-full .Root__main-view :is(.collection-collectionEntityHeroCard-likedSongs, .collection-collectionEntityHeroCard-yourEpisodes, .main-yourEpisodes-yourEpisodesCard, .main-yourEpisodes-coverContainer) {
+  background: var(--term-bg-elevated) !important;
+  background-image: none !important;
+  border: 1px solid var(--term-border) !important;
+  color: var(--term-text) !important;
+}
+
+html.terminal-full .Root__main-view .main-yourEpisodes-coverIcon,
+html.terminal-full .Root__main-view .main-yourEpisodes-coverIcon svg {
+  color: var(--term-green) !important;
+  fill: var(--term-green) !important;
+}
+
+/* ---- 9. Loading skeletons: dim blinking blocks (a cursor blink, 1s
+   step-end — no shimmer gradient). */
+html.terminal-full .Root__main-view :is(.main-card-imageContainerSkeleton, .main-trackList-placeholderStart, .main-trackList-placeholderVariable, .main-trackList-placeholderEnd, .main-trackList-placeholderIndex, .collection-collectionEntityHeroCard-skeletonRow, [data-encore-id="skeleton"]) {
+  background: var(--term-border) !important;
+  background-image: none !important;
+  opacity: 0.5;
+  animation: tf-skeleton 1s step-end infinite;
+}
+
+@keyframes tf-skeleton {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.2; }
+}
+
+/* ---- 10. Settings (and any x-settings page): a config file ------------
+   `# title`, `[section]` headers, `key ...... = value` rows, toggles
+   drawn as [x] / [ ] over the native checkbox input (which still takes
+   the click and keeps its role/label). */
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) {
+  font-size: 13px;
+}
+
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) h1 {
+  font-size: 22px !important;
+  letter-spacing: 0 !important;
+}
+
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) h1::before {
+  content: "# ";
+  color: var(--term-green);
+}
+
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) :is(.x-settings-section h2, .x-settings-headerContainer h2, .x-settings-outputSectionHeader) {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0 !important;
+  color: var(--term-green) !important;
+  margin-top: 20px;
+}
+
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) :is(.x-settings-section h2, .x-settings-headerContainer h2, .x-settings-outputSectionHeader)::before {
+  content: "[";
+}
+
+html.terminal-full :is([data-testid="settings-page"], .x-settings-container) :is(.x-settings-section h2, .x-settings-headerContainer h2, .x-settings-outputSectionHeader)::after {
+  content: "]";
+}
+
+html.terminal-full .x-settings-row {
+  border-bottom: 1px dashed var(--term-border);
+  padding-block: 4px;
+  min-block-size: 40px;
+  transition: background-color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .x-settings-row:hover {
+  background-color: var(--term-bg-tinted);
+}
+
+html.terminal-full .x-settings-firstColumn,
+html.terminal-full .x-settings-firstColumn * {
+  color: var(--term-text) !important;
+  font-size: 13px !important;
+}
+
+html.terminal-full .x-settings-secondColumn::before {
+  content: "=";
+  margin-inline-end: 10px;
+  color: var(--term-subdued);
+}
+
+html.terminal-full .x-settings-secondColumn {
+  display: flex;
+  align-items: center;
+}
+
+html.terminal-full .x-settings-container :is(select, input[type="text"], input[type="number"], input:not([type]), textarea),
+html.terminal-full [data-testid="settings-page"] :is(select, input[type="text"], input[type="number"], input:not([type]), textarea) {
+  background-color: var(--term-bg-elevated) !important;
+  border: 1px solid var(--term-border) !important;
+  color: var(--term-text) !important;
+  box-shadow: none !important;
+  min-block-size: 32px;
+}
+
+html.terminal-full .x-settings-container :is(select, input, textarea):focus-visible,
+html.terminal-full [data-testid="settings-page"] :is(select, input, textarea):focus-visible {
+  border-color: var(--term-green) !important;
+}
+
+html.terminal-full .x-toggle-wrapper {
+  min-block-size: 32px;
+  min-inline-size: 44px;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+html.terminal-full .x-toggle-indicatorWrapper {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  inline-size: auto !important;
+  block-size: auto !important;
+  display: inline-flex !important;
+  align-items: center;
+}
+
+html.terminal-full .x-toggle-indicator {
+  display: none !important;
+}
+
+html.terminal-full .x-toggle-indicatorWrapper::before {
+  content: "[ ]";
+  white-space: pre;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--term-subdued);
+  transition: color var(--tf-fast) var(--tf-ease);
+}
+
+html.terminal-full .x-toggle-input:checked + .x-toggle-indicatorWrapper::before,
+html.terminal-full .x-toggle-input:checked ~ .x-toggle-indicatorWrapper::before {
+  content: "[x]";
+  color: var(--term-green);
+}
+
+html.terminal-full .x-toggle-wrapper:hover .x-toggle-indicatorWrapper::before {
+  color: var(--term-text);
+}
+
+html.terminal-full .x-toggle-input:checked + .x-toggle-indicatorWrapper:hover::before,
+html.terminal-full .x-toggle-wrapper:hover .x-toggle-input:checked ~ .x-toggle-indicatorWrapper::before {
+  color: var(--term-green);
+}
+
+html.terminal-full .x-toggle-input:disabled ~ .x-toggle-indicatorWrapper::before {
+  opacity: 0.4;
+}
+
+html.terminal-full .x-toggle-input:focus-visible ~ .x-toggle-indicatorWrapper {
+  outline: 2px solid var(--term-green);
+  outline-offset: 2px;
+}
+
+/* The equalizer canvas is drawn in Spotify green by Spotify's own code; a
+   hue shift is the only lever (Comfy does the same). */
+html.terminal-full .x-settings-equalizerPanelCanvas {
+  filter: hue-rotate(28deg) saturate(0.6);
+}
+
+/* Reduced motion: the global rule already shortens every animation; our
+   own ones are switched off outright so nothing even flickers. */
+@media (prefers-reduced-motion: reduce) {
+  html.terminal-full .Root__main-view .main-card-card .main-card-imageContainer::after,
+  html.terminal-full .Root__main-view .main-entityHeader-title::after,
+  html.terminal-full .Root__main-view .main-trackList-trackListRow,
+  html.terminal-full .Root__main-view :is(.main-card-imageContainerSkeleton, .main-trackList-placeholderStart, .main-trackList-placeholderVariable, .main-trackList-placeholderEnd, .main-trackList-placeholderIndex, .collection-collectionEntityHeroCard-skeletonRow, [data-encore-id="skeleton"]) {
+    animation: none !important;
+  }
+}
 /* --- END FULL/PAGES ------------------------------------------------------ */
 
 /* --- FULL/CHROME (agent D) ----------------------------------------------- */
