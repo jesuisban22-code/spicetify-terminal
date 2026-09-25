@@ -1418,6 +1418,116 @@
 	}
 
 	fullConversionParts.push({ setup: setupFullShell, teardown: teardownFullShell });
+	// Pane titles ([0:~/library] [1:~/…] [2:now-playing]) are drawn in our
+	// own fixed layer, positioned from each pane's measured rect, rather
+	// than as ::before pseudo-elements on Spotify's panes. A pseudo-element
+	// only lands in the title bar if the pane's internal layout matches what
+	// we expect; on the real client it could end up over the pane content
+	// and overlap its text. Measuring the rect makes the position exact
+	// whatever Spotify's markup, and the layer never takes clicks.
+	var paneTitles = null; // { root, labels: {nav, main, right}, ro, timer, onResize, onOver }
+
+	function paneTitleText(el, prop, fallback) {
+		var v = "";
+		try { v = getComputedStyle(el).getPropertyValue(prop).trim(); } catch (e) { /* detached */ }
+		v = v.replace(/^["']|["']$/g, "");
+		return v || fallback;
+	}
+
+	function layoutPaneTitles() {
+		if (!paneTitles) return;
+		var html = document.documentElement;
+		var panes = {
+			nav: document.querySelector(".Root__nav-bar"),
+			main: document.querySelector(".Root__main-view"),
+			right: document.querySelector(".Root__right-sidebar")
+		};
+		var hovered = paneTitles.hovered;
+		Object.keys(panes).forEach(function (k) {
+			var el = panes[k], label = paneTitles.labels[k];
+			var r = el && el.getBoundingClientRect();
+			var visible = !!(r && r.width > 40 && r.height > 40);
+			if (visible && k === "right") {
+				var aside = el.querySelector("aside");
+				visible = !!(aside && aside.children.length);
+			}
+			label.style.display = visible ? "" : "none";
+			if (!visible) return;
+			var text;
+			if (k === "nav") text = r.width < 120 ? "[0]" : "[0:~/library]";
+			else if (k === "main") text = paneTitleText(html, "--tf-main-title", "[1:~/home]");
+			else text = paneTitleText(el, "--tf-right-title", "[2:now-playing]");
+			if (label.textContent !== text) label.textContent = text;
+			label.style.transform = "translate(" + Math.round(r.left + 6) + "px," + Math.round(r.top + 3) + "px)";
+			label.style.maxWidth = Math.max(0, Math.round(r.width - 12)) + "px";
+			label.classList.toggle("is-active", hovered === k);
+		});
+	}
+
+	function schedulePaneTitles() {
+		if (!paneTitles || paneTitles.raf) return;
+		paneTitles.raf = requestAnimationFrame(function () {
+			if (!paneTitles) return;
+			paneTitles.raf = 0;
+			layoutPaneTitles();
+		});
+	}
+
+	function setupPaneTitles() {
+		if (paneTitles) return;
+		var root = document.createElement("div");
+		root.id = "tf-pane-titles";
+		root.setAttribute("aria-hidden", "true");
+		var labels = {};
+		["nav", "main", "right"].forEach(function (k) {
+			var s = document.createElement("span");
+			s.className = "tf-pane-title tf-pane-title-" + k;
+			root.appendChild(s);
+			labels[k] = s;
+		});
+		document.body.appendChild(root);
+		paneTitles = { root: root, labels: labels, hovered: null, raf: 0 };
+		paneTitles.onResize = schedulePaneTitles;
+		window.addEventListener("resize", paneTitles.onResize);
+		paneTitles.onOver = function (e) {
+			var t = e.target, k = null;
+			if (t && t.closest) {
+				if (t.closest(".Root__nav-bar")) k = "nav";
+				else if (t.closest(".Root__main-view")) k = "main";
+				else if (t.closest(".Root__right-sidebar")) k = "right";
+			}
+			if (k !== paneTitles.hovered) {
+				paneTitles.hovered = k;
+				schedulePaneTitles();
+			}
+		};
+		document.addEventListener("pointerover", paneTitles.onOver, true);
+		if (window.ResizeObserver) {
+			paneTitles.ro = new ResizeObserver(schedulePaneTitles);
+			[".Root__nav-bar", ".Root__main-view", ".Root__right-sidebar"].forEach(function (sel) {
+				var el = document.querySelector(sel);
+				if (el) paneTitles.ro.observe(el);
+			});
+		}
+		// Titles also change on navigation and when the right panel switches
+		// content; a slow poll covers both without a MutationObserver on the
+		// whole app (it only writes when something actually changed).
+		paneTitles.timer = setInterval(schedulePaneTitles, 500);
+		layoutPaneTitles();
+	}
+
+	function teardownPaneTitles() {
+		if (!paneTitles) return;
+		window.removeEventListener("resize", paneTitles.onResize);
+		document.removeEventListener("pointerover", paneTitles.onOver, true);
+		if (paneTitles.ro) paneTitles.ro.disconnect();
+		clearInterval(paneTitles.timer);
+		if (paneTitles.raf) cancelAnimationFrame(paneTitles.raf);
+		if (paneTitles.root.parentNode) paneTitles.root.parentNode.removeChild(paneTitles.root);
+		paneTitles = null;
+	}
+
+	fullConversionParts.push({ setup: setupPaneTitles, teardown: teardownPaneTitles });
 	// --- END FULL/SHELL ----------------------------------------------------
 
 	// --- FULL/PLAYER: status line, right sidebar, fullscreen (agent B) ----
@@ -2233,15 +2343,20 @@
 	//     Alt keeps this combo distinct from both.
 	//   - No Windows, GNOME/KDE/Xfce or macOS system default uses it.
 	//   - Windows reports AltGr as Ctrl+Alt, and AltGr+Shift+N types a
-	//     letter on some layouts (Polish "Ń"): AltGraph state and any
-	//     text field are both ignored, so typing is never hijacked.
+	//     letter on some layouts (Polish "Ń"). Chromium on Windows also
+	//     reports AltGraph for a plain left Ctrl+Alt, so the AltGraph
+	//     state can't be used to tell the two apart (it made the shortcut
+	//     unreachable there). Instead, off macOS, the combo only counts
+	//     when it still produces a plain "n": a layout where it types
+	//     another character is left alone. Text fields are ignored too,
+	//     so typing is never hijacked.
 	// Registered once, outside the setup/teardown parts, because it has to
 	// work in native mode too — that's how you come back.
 	document.addEventListener("keydown", function (e) {
 		if (e.code !== "KeyN" || !e.shiftKey || !e.altKey || e.repeat) return;
 		var mod = currentOs === "mac" ? e.metaKey || e.ctrlKey : e.ctrlKey && !e.metaKey;
 		if (!mod) return;
-		if (e.getModifierState && e.getModifierState("AltGraph")) return;
+		if (currentOs !== "mac" && typeof e.key === "string" && e.key.length === 1 && e.key.toLowerCase() !== "n") return;
 		if (isTypingContext()) return;
 		e.preventDefault();
 		tfNotify(tfSetFullMode(!settings.fullConversion) + " (" + tfShortcutLabel() + " pour basculer)");

@@ -1075,7 +1075,14 @@ html.terminal-full .Root__top-container:not(:has(:is(.Root__nav-bar, .Root__main
    its static position (top-left of the pane's content box) while escaping
    the pane's overflow:hidden, which would otherwise clip anything drawn in
    the border area; the negative top margin lifts it into the title bar.
-   Same technique the spicetify "text" theme uses for its pane labels. */
+   Same technique the spicetify "text" theme uses for its pane labels.
+   Escaping overflow also means nothing clips a long title to its pane
+   (the main one can be ~70 chars), so the width is capped with an
+   ellipsis and the label is filled with the title-bar colour: if a title
+   still runs past its pane, the next pane's title paints over it instead
+   of the two texts being drawn on top of each other. place-self pins the
+   static position to the start corner whatever alignment the pane's own
+   flex/grid layout uses. */
 html.terminal-full .Root__nav-bar::before,
 html.terminal-full .Root__main-view::before,
 html.terminal-full .Root__right-sidebar:has(aside:not(:empty))::before {
@@ -1090,8 +1097,12 @@ html.terminal-full .Root__right-sidebar:has(aside:not(:empty))::before {
   font-weight: 400;
   letter-spacing: 0;
   white-space: nowrap;
+  max-width: min(64ch, 40vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  place-self: start;
   color: var(--term-subdued);
-  background: transparent;
+  background: var(--tf-shell-title-bg);
   pointer-events: none;
   animation: tf-shell-title-in var(--tf-slow) steps(4, end) backwards;
 }
@@ -1256,6 +1267,13 @@ html.terminal-full .main-globalNav-historyButtons::before {
   font-weight: 700;
   color: var(--term-green);
   white-space: nowrap;
+  /* theme.js fills in the real user and directory (up to ~50 chars), so
+     the breakpoints below can't be the only guard against running into
+     the centered search box. */
+  min-width: 0;
+  max-width: 26ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
   pointer-events: none;
 }
 
@@ -1402,7 +1420,8 @@ html.terminal-full .Root__globalNav :is(input[data-testid="search-input"], .main
 }
 
 html.terminal-full .Root__globalNav :is(input[data-testid="search-input"], .main-globalNav-searchInputText, input.main-topBar-searchBar)::placeholder {
-  color: transparent !important;
+  color: var(--term-subdued) !important;
+  opacity: 1;
 }
 
 /* The native magnifier (not inside a button) gives way to the glyph. */
@@ -1428,17 +1447,7 @@ html.terminal-full .main-globalNav-searchInputContainer:has(input)::before {
   color: var(--term-green);
 }
 
-html.terminal-full .main-globalNav-searchInputContainer:has(input:placeholder-shown)::after {
-  content: "rechercher…";
-  left: 34px;
-  color: var(--term-subdued);
-}
 
-html.terminal-full .main-globalNav-searchInputContainer:has(input:placeholder-shown:focus)::after {
-  content: "▋";
-  color: var(--term-green);
-  animation: term-blink 1s step-end infinite;
-}
 
 /* Browse (next to the field) and the Ctrl K hint */
 html.terminal-full .main-globalNav-browseButtonWrapper button {
@@ -1556,6 +1565,12 @@ html.terminal-full .main-yourLibraryX-collapseButton {
   font-size: 0 !important; /* native label stays for screen readers */
   color: var(--term-text) !important;
   background: transparent !important;
+}
+
+/* The native label sits in an encore text span that sets its own
+   font-size, so the button's font-size:0 alone doesn't reach it. */
+html.terminal-full .main-yourLibraryX-collapseButton * {
+  font-size: 0 !important;
 }
 
 html.terminal-full .main-yourLibraryX-collapseButton svg {
@@ -1852,6 +1867,56 @@ html.terminal-full .Root__nav-bar [data-encore-id="card"]:hover {
     animation: none !important;
   }
 }
+/* Pane titles now come from theme.js (#tf-pane-titles, positioned from the
+   panes' measured rects) — the old ::before labels had to guess where
+   their static position would land in Spotify's real markup and could end
+   up over pane content. Neutralised here, after every rule that set them. */
+html.terminal-full .Root__nav-bar::before,
+html.terminal-full .Root__main-view::before,
+html.terminal-full .Root__right-sidebar::before,
+html.terminal-full .Root__nav-bar:has(.main-yourLibraryX-libraryIsCollapsed)::before,
+html.terminal-full .Root__right-sidebar:has(aside:not(:empty))::before {
+  content: none !important;
+}
+
+#tf-pane-titles {
+  position: fixed;
+  inset: 0 auto auto 0;
+  width: 0;
+  height: 0;
+  z-index: 60;
+  pointer-events: none;
+}
+
+html:not(.terminal-full) #tf-pane-titles {
+  display: none;
+}
+
+.tf-pane-title {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: calc(var(--tf-title-h, 22px) - 6px);
+  line-height: calc(var(--tf-title-h, 22px) - 6px);
+  padding: 0 6px;
+  font-family: var(--term-font);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--term-subdued);
+  background: var(--term-bg-tinted, #1a1c22);
+  box-sizing: border-box;
+  transition: color var(--tf-fast, 120ms) ease, background-color var(--tf-fast, 120ms) ease;
+}
+
+.tf-pane-title.is-active {
+  color: var(--term-bg);
+  background: var(--term-green);
+}
+
+/* Spotify's own search placeholder stays: overlaying our own text on top
+   of it drew two strings in the same spot whenever the native one showed. */
 /* --- END FULL/SHELL ------------------------------------------------------ */
 
 /* --- FULL/PLAYER (agent B) ----------------------------------------------- */
@@ -2781,7 +2846,10 @@ html.terminal-full #Desktop_PanelContainer_Id [data-encore-id="listRow"] {
   background-color: transparent !important;
   box-shadow: inset 2px 0 0 0 transparent;
   transition: background-color var(--tf-fast) var(--tf-ease), box-shadow var(--tf-fast) var(--tf-ease);
-  animation: tfp-row-in var(--tf-med) var(--tf-ease) both;
+  /* backwards, not both: a forwards fill would pin transform:none on the
+     row for good, overriding any transform Spotify sets on it (list
+     virtualization, drag and drop). */
+  animation: tfp-row-in var(--tf-med) var(--tf-ease) backwards;
 }
 
 html.terminal-full :is(.main-nowPlayingView-queueItem, .main-nowPlayingView-artistOnTourItem, .main-buddyFeed-friendActivity, .main-devicePicker-devicesList > li):hover,
@@ -4387,7 +4455,7 @@ html.terminal-full .main-contextMenu-filterInput {
 
 /* Rows fade in one after the other (first 8 only, 20ms apart). */
 html.terminal-full .main-contextMenu-menu > li {
-  animation: tf-row-in var(--tf-med) var(--tf-ease) both;
+  animation: tf-menu-row-in var(--tf-med) var(--tf-ease) backwards;
 }
 html.terminal-full .main-contextMenu-menu > li:nth-child(2) { animation-delay: 20ms; }
 html.terminal-full .main-contextMenu-menu > li:nth-child(3) { animation-delay: 40ms; }
@@ -4397,7 +4465,7 @@ html.terminal-full .main-contextMenu-menu > li:nth-child(6) { animation-delay: 1
 html.terminal-full .main-contextMenu-menu > li:nth-child(7) { animation-delay: 120ms; }
 html.terminal-full .main-contextMenu-menu > li:nth-child(n + 8) { animation-delay: 140ms; }
 
-@keyframes tf-row-in {
+@keyframes tf-menu-row-in {
   from { opacity: 0; transform: translateX(-4px); }
   to { opacity: 1; transform: none; }
 }
@@ -4685,13 +4753,6 @@ html.terminal-full a[aria-label="Spotify"] {
   display: none !important;
 }
 
-/* Page footer (company/communities/legal links, "© Spotify AB"). The
-   legal pages stay reachable from the About dialog's licences link. */
-html.terminal-full .main-page-footerContainer,
-html.terminal-full .main-page-footerSectionWrapper {
-  display: none !important;
-}
-
 /* Premium upsells: buttons, nav items and menu entries (the whole <li>,
    so no empty row is left in the menu). Hiding only — nothing here
    touches ads, playback or any paid feature. */
@@ -4817,5 +4878,46 @@ html.terminal-full .terminal-settings::after {
 
 html.terminal-full.terminal-os-mac .terminal-settings::after {
   content: "# cmd+maj+alt+n : basculer terminal complet / natif · cmd+maj+k : palette";
+}
+
+/* ==========================================================================
+   Overlap guard (after the code review of the first real-client test).
+   Word labels injected into Spotify's own buttons ("enregistrer", "lyrics",
+   "vol", "✱ news"…) assume the native button can grow to fit them; on the
+   real client several of those buttons have a fixed width, so the words
+   spilled over their neighbours and read as superimposed text. Buttons
+   keep their glyph and Spotify's own tooltip / aria-label (hover shows
+   what they do); only the extra words go. Placed last so it wins.
+   ========================================================================== */
+html.terminal-full .Root__globalNav .main-topBar-whatsNewFeed::before { content: "✱" !important; }
+html.terminal-full .Root__globalNav :is(.main-topBar-buddyFeed, .main-globalNav-buddyFeed)::before { content: "☺" !important; }
+html.terminal-full .main-yourLibraryX-collapseButton::after { content: none !important; }
+html.terminal-full .main-nowPlayingBar-left::before { content: none !important; display: none !important; }
+html.terminal-full .main-nowPlayingBar-left { padding-left: 12px !important; }
+html.terminal-full [data-testid="volume-bar-toggle-mute-button"]::before { content: none !important; }
+html.terminal-full .npv-exitFullScreenButton-button::before { content: "✕" !important; }
+html.terminal-full .Root__main-view :is(.x-categoryCard-CategoryCard, [class*="heroCategoryCard-HeroCategoryCard"])::after { content: none !important; }
+html.terminal-full .Root__main-view :is(.main-actionBar-ActionBarPlayButtonContainer button, .main-actionBar-ActionBarRow [data-testid="play-button"])::after,
+html.terminal-full .Root__main-view :is(.main-actionBar-ActionBarPlayButtonContainer button, .main-actionBar-ActionBarRow [data-testid="play-button"])[data-tf-state]::after {
+  content: "]" !important;
+}
+html.terminal-full .Root__main-view .main-actionBar-ActionBarRow :is(
+  .main-actionBar-shuffleButton, [data-testid="shuffle-button"],
+  .main-addButton-button, [data-testid="add-button"],
+  .main-moreButton-button, [data-testid="more-button"],
+  .x-downloadButton-button, [data-testid="download-button"]
+)::after {
+  content: none !important;
+}
+html.terminal-full :is(
+  [data-testid="control-button-npv"],
+  [data-testid="lyrics-button"],
+  [data-testid="control-button-queue"],
+  [data-testid="pip-toggle-button"],
+  [data-testid="fullscreen-mode-button"]
+)::after,
+html.terminal-full .main-nowPlayingBar-extraControls :is(.main-devicePicker-controlButton, button[aria-describedby*="connect"])::after {
+  content: none !important;
+  display: none !important;
 }
 /* --- END FULL/CHROME ----------------------------------------------------- */
