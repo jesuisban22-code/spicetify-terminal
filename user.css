@@ -936,7 +936,8 @@ html.terminal-os-windows #terminal-compiling-badge {
    -webkit-app-region on real elements is what Chromium's draggable-region
    collection is documented and battle-tested against, so this doesn't bet
    window dragging on pseudo-element support. Hidden everywhere except
-   Windows, so on Linux/macOS it's display:none and changes nothing. */
+   Windows and macOS (see the macOS section below), so on Linux it's
+   display:none and changes nothing. */
 .terminal-drag-strip {
   display: none;
 }
@@ -955,5 +956,43 @@ html.terminal-os-windows .terminal-drag-strip {
    drag strip at the same moment so the real top bar's no-drag controls
    work again immediately rather than after the 300ms removal delay. */
 html.terminal-os-windows #terminal-boot-overlay.terminal-boot-hide .terminal-drag-strip {
+  display: none;
+}
+
+/* ==========================================================================
+   macOS window chrome — every rule here is scoped to html.terminal-os-mac,
+   so Linux and Windows render exactly as before. Spotify on macOS uses a
+   hidden-inset title bar: there is no native title bar strip, the
+   close/minimize/zoom "traffic lights" are drawn by the OS at the TOP-LEFT
+   of the window, on top of the web content, and Spotify's own top bar is
+   the `-webkit-app-region: drag` area that moves the window.
+
+   What that means for the theme:
+     - Boot + command-palette overlays have the exact problem described in
+       the Windows section above: they cover the top bar, so the window can
+       only be moved by luck (or not at all) while one is open. Same fix:
+       turn on the overlays' .terminal-drag-strip. The traffic lights are
+       hit-tested natively before any page drag region, so they keep
+       working while the strip passes under them.
+     - Nothing the theme draws is fixed to the top-left corner (the boot text
+       is centered, the palette box starts at 14vh and is centered, the
+       matrix rain / scanlines are pointer-events:none), so the traffic
+       lights never hide anything that matters; no offset is needed.
+     - The compiling badge sits top-RIGHT, where macOS has no window
+       buttons, so unlike Windows it stays where it is on Linux.
+   ========================================================================== */
+html.terminal-os-mac .terminal-drag-strip {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 32px;
+  -webkit-app-region: drag;
+}
+
+/* Same as Windows: drop the strip as soon as the boot overlay starts fading,
+   so the real top bar's no-drag controls work again immediately. */
+html.terminal-os-mac #terminal-boot-overlay.terminal-boot-hide .terminal-drag-strip {
   display: none;
 }
