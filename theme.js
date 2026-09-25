@@ -480,12 +480,33 @@
 	// matches playHistory's lifetime).
 	var trackDataCache = {};
 
+	// Drop everything the previous track left behind — the inline
+	// --track-accent (raw or mood-tinted, see applyMoodTint) and
+	// --track-bpm-ms on <html>, plus its tempo markers — so a track with no
+	// color/audio-features (local file, podcast, nothing playing) falls back
+	// to the CSS defaults in user.css instead of keeping stale values.
+	// Called synchronously right before the new values are set (cached path),
+	// so there is no paint in between and no visible flash.
+	function resetTrackVisuals() {
+		document.documentElement.style.removeProperty("--track-accent");
+		document.documentElement.style.removeProperty("--track-bpm-ms");
+		clearTempoMarkers();
+	}
+
 	function setupNowPlayingPulse() {
 		function apply(uri) {
-			if (!settings.pulse || !uri) return;
+			if (!settings.pulse) return;
+			if (!uri) {
+				// songchange with no track (queue ended, nothing playing).
+				lastExtractedColor = null;
+				lastAudioFeatures = null;
+				resetTrackVisuals();
+				return;
+			}
 			var trackId = uri.split(":")[2];
 			lastExtractedColor = null;
 			lastAudioFeatures = null;
+			resetTrackVisuals();
 
 			var cached = trackDataCache[uri];
 			if (cached) {
@@ -551,7 +572,7 @@
 
 		Spicetify.Player.addEventListener("songchange", function (event) {
 			var item = (event && event.data && event.data.item) || (Spicetify.Player.data && Spicetify.Player.data.item);
-			if (item) apply(item.uri);
+			apply(item && item.uri);
 		});
 
 		if (Spicetify.Player.data && Spicetify.Player.data.item) {
