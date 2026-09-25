@@ -155,6 +155,7 @@
 	}
 
 	var settings = loadSettings();
+	var fullConversionParts = []; // { setup: fn, teardown: fn }, registered in the FULL/* sections
 	// Tag <html> right away so the full-conversion CSS applies from the
 	// first paint instead of flashing the native UI until Spicetify is ready.
 	document.documentElement.classList.toggle("terminal-full", !!settings.fullConversion);
@@ -1184,7 +1185,8 @@
 	// annotated (data-* / classes) or overlaid — so playback, menus and
 	// Spicetify APIs that click native buttons keep working.
 	// =======================================================================
-	var fullConversionParts = []; // { setup: fn, teardown: fn } registered below
+	// fullConversionParts is declared near `settings` (top of file) so it
+	// exists even when the init waitFor fires synchronously.
 
 	function setupFullConversion() {
 		applyFullConversionSetting();
