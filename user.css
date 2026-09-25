@@ -1066,10 +1066,11 @@ html.terminal-full .Root__right-sidebar:has(aside:not(:empty)) {
 
 /* Active pane: hovered, else focused (so two panes never light up at once:
    the one under the pointer wins over the one holding keyboard focus). */
-html.terminal-full :is(.Root__nav-bar, .Root__main-view, .Root__right-sidebar):hover,
-html.terminal-full .Root__top-container:not(:has(:is(.Root__nav-bar, .Root__main-view, .Root__right-sidebar):hover)) :is(.Root__nav-bar, .Root__main-view, .Root__right-sidebar):focus-within {
-  --tf-pane-line: var(--term-green);
-}
+/* (Removed: changing --tf-pane-line on :hover / :focus-within re-styled
+   every descendant of the pane — thousands of nodes — on each pointer
+   move between panes, and the :has(:hover) guard re-matched the whole app
+   on every hover change. The active pane is now shown by its title in
+   #tf-pane-titles, which theme.js updates without touching the panes.) */
 
 /* Title text. position:fixed with top/left left at auto keeps the box at
    its static position (top-left of the pane's content box) while escaping
@@ -1139,8 +1140,7 @@ html.terminal-full .Root__nav-bar:has(.main-yourLibraryX-libraryIsCollapsed)::be
 
 /* Active title: inverse video + a short stepped reveal each time the pane
    becomes active (the animation restarts because the rule starts matching). */
-html.terminal-full :is(.Root__nav-bar, .Root__main-view, .Root__right-sidebar):hover::before,
-html.terminal-full .Root__top-container:not(:has(:is(.Root__nav-bar, .Root__main-view, .Root__right-sidebar):hover)) :is(.Root__nav-bar, .Root__main-view, .Root__right-sidebar):focus-within::before {
+html.terminal-full .tf-never-matches::before {
   color: var(--term-bg);
   background: var(--term-green);
   animation: tf-shell-title-active var(--tf-med) steps(3, end);
@@ -4954,5 +4954,41 @@ html.terminal-full .playback-bar :is(.playback-bar__progress-time-elapsed, [data
 }
 html.terminal-full .playback-bar :is(.main-playbackBarRemainingTime-container, [data-testid="playback-duration"])::before {
   content: none !important;
+}
+
+/* Search: the native magnifier lives inside a button on the real client,
+   so it was never hidden and our ⌕ glyph was drawn over it. Keep native. */
+html.terminal-full .main-globalNav-searchInputContainer:has(input)::before {
+  content: none !important;
+}
+html.terminal-full .main-globalNav-searchInputContainer:has(input) svg:not(button svg) {
+  display: revert !important;
+}
+
+/* Smoothness in full mode (real client felt sluggish):
+   - CRT scanlines: drop the full-window multiply blend (re-blended every
+     frame under any animation) and the permanent sweep; the static lines
+     stay as a plain translucent layer the compositor draws once.
+   - Now-playing glow: a 16px blur animated forever repaints every frame;
+     the status line already carries the pulse as a 1px top line.
+   - Page transitions: no blur filter on the whole main view. */
+html.terminal-full.terminal-crt-enabled::after {
+  mix-blend-mode: normal !important;
+}
+html.terminal-full.terminal-crt-enabled::before {
+  animation: none !important;
+  display: none !important;
+}
+html.terminal-full .main-nowPlayingWidget-coverArt::after {
+  animation: none !important;
+  filter: none !important;
+  display: none !important;
+}
+html.terminal-full .terminal-view-enter {
+  animation: tf-view-in var(--tf-med, 200ms) var(--tf-ease, ease-out) !important;
+}
+@keyframes tf-view-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
 }
 /* --- END FULL/CHROME ----------------------------------------------------- */

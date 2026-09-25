@@ -1427,13 +1427,6 @@
 	// whatever Spotify's markup, and the layer never takes clicks.
 	var paneTitles = null; // { root, labels: {nav, main, right}, ro, timer, onResize, onOver }
 
-	function paneTitleText(el, prop, fallback) {
-		var v = "";
-		try { v = getComputedStyle(el).getPropertyValue(prop).trim(); } catch (e) { /* detached */ }
-		v = v.replace(/^["']|["']$/g, "");
-		return v || fallback;
-	}
-
 	function layoutPaneTitles() {
 		if (!paneTitles) return;
 		var html = document.documentElement;
@@ -1453,10 +1446,15 @@
 			}
 			label.style.display = visible ? "" : "none";
 			if (!visible) return;
+			// Read from inline style / the DOM, never getComputedStyle: that
+			// forces a full style recalc whenever anything is dirty, which on
+			// a 500ms poll made the whole client stutter.
 			var text;
 			if (k === "nav") text = r.width < 120 ? "[0]" : "[0:~/library]";
-			else if (k === "main") text = paneTitleText(html, "--tf-main-title", "[1:~/home]");
-			else text = paneTitleText(el, "--tf-right-title", "[2:now-playing]");
+			else if (k === "main") text = html.style.getPropertyValue("--tf-main-title").trim().replace(/^["']|["']$/g, "") || "[1:~/home]";
+			else if (el.querySelector("#queue-panel, [data-testid=\"queue-page\"]")) text = "[2:queue]";
+			else if (el.querySelector("[data-testid=\"buddy-feed\"]")) text = "[2:friends]";
+			else text = "[2:now-playing]";
 			if (label.textContent !== text) label.textContent = text;
 			label.style.transform = "translate(" + Math.round(r.left + 6) + "px," + Math.round(r.top + 3) + "px)";
 			label.style.maxWidth = Math.max(0, Math.round(r.width - 12)) + "px";
@@ -1512,7 +1510,7 @@
 		// Titles also change on navigation and when the right panel switches
 		// content; a slow poll covers both without a MutationObserver on the
 		// whole app (it only writes when something actually changed).
-		paneTitles.timer = setInterval(schedulePaneTitles, 500);
+		paneTitles.timer = setInterval(schedulePaneTitles, 1000);
 		layoutPaneTitles();
 	}
 
