@@ -26,19 +26,23 @@
 
 	var SESSION_START = Date.now();
 
-	// Same stack as --term-font in user.css — keep the two in sync. The
-	// injected mini-player CSS can't read that variable (it lives in a
-	// separate document), hence the copy. Order matters: the Linux fonts
-	// (JetBrains Mono → DejaVu Sans Mono) come first so a Linux machine
-	// resolves exactly the same face it always has, even if it happens to
-	// have Cascadia installed; Cascadia/Consolas only get reached on
-	// Windows (Menlo on macOS), where none of the Linux faces exist.
 	// Shown by the boot log and `neofetch`; keep in sync with CHANGELOG.md.
 	var THEME_VERSION = "1.2.0";
 
-	var TERM_FONT_STACK =
-		"'JetBrains Mono', 'Fira Code', 'Hack', 'DejaVu Sans Mono', " +
-		"'Cascadia Mono', 'Cascadia Code', 'Consolas', 'Menlo', monospace";
+	// Optimize font stack per OS: on Windows, Cascadia/Consolas are faster
+	// to resolve than searching for DejaVu Sans Mono first. This will be
+	// called after currentOs is available.
+	function getTERMFontStack(os) {
+		os = os || "linux";
+		if (os === "windows") {
+			return "'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', 'Consolas', monospace";
+		} else if (os === "mac") {
+			return "'JetBrains Mono', 'Menlo', monospace";
+		}
+		// Linux: keep original order with all fallbacks
+		return "'JetBrains Mono', 'Fira Code', 'Hack', 'DejaVu Sans Mono', monospace";
+	}
+	var TERM_FONT_STACK = getTERMFontStack("linux"); // default, will be updated with currentOs later
 
 	// Real logged-in display name for the palette's `whoami`/`neofetch`/
 	// `sudo` easter egg — reads the actual Spicetify session instead of a
@@ -63,48 +67,90 @@
 	// ---------------------------------------------------------------------
 	var SETTINGS_KEY = "spicetify-terminal-theme:settings";
 
-	// ---------------------------------------------------------------------
-	// Feature registry — the single source of truth for every toggleable
-	// feature: its default, its settings-panel row, and the setup call it
-	// gets at init. Previously these three things lived in three separate
-	// places (DEFAULT_SETTINGS, the waitFor init list, and buildSettingsPanel's
-	// row list) that had to be kept in sync by hand on every new feature —
-	// this is that sync, done once. `setup` is a hoisted function reference
-	// (safe to use here even though those functions are defined later in the
-	// file — function declarations are hoisted before this line runs), called
-	// unconditionally at init; each feature's own listeners are the ones that
-	// check `settings[key]` before actually doing anything, exactly as
-	// before. `onToggle` runs any extra live side effect a checkbox needs
-	// beyond just flipping the setting (e.g. stopping Matrix rain the moment
-	// it's unchecked). `hasDelay` marks the one row (Matrix rain) that also
-	// shows a numeric delay input.
+	// ===== LOCALIZATION (i18n) =====
+	// Auto-detect system language for UI labels
+	var SYSTEM_LOCALE = (function() {
+		var lang = (navigator.language || navigator.userLanguage || "en-US").split("-")[0].toLowerCase();
+		return lang === "fr" ? "fr" : "en";
+	})();
+
+	var TRANSLATIONS = {
+		en: {
+			boot: "boot sequence on startup",
+			pulse: "now playing pulse (color + tempo)",
+			transitions: "page transitions",
+			typewriter: "typewriter-style titles",
+			palette: "command palette (Ctrl+Shift+K)",
+			tempoMarkers: "tempo markers on progress bar",
+			visualizer: "frequency visualizer (audio-synced)",
+			streamBadge: "'connection established' flash",
+			cursor: "terminal block cursor",
+			crtScanlines: "CRT scanline overlay",
+			miniPlayerTheme: "theme applied to mini player",
+			matrixRain: "matrix rain screensaver (idle, 2 min default)"
+		},
+		fr: {
+			boot: "séquence de démarrage au lancement",
+			pulse: "pulsation lecture en cours (couleur + tempo)",
+			transitions: "transitions de page",
+			typewriter: "titres façon machine à écrire",
+			palette: "palette de commandes (Ctrl+Shift+K)",
+			tempoMarkers: "marqueurs de tempo sur la barre de lecture",
+			visualizer: "visualiseur de fréquence (synchronisé à la musique)",
+			streamBadge: "flash \"connexion établie\"",
+			cursor: "curseur bloc terminal",
+			crtScanlines: "overlay lignes de balayage CRT",
+			miniPlayerTheme: "thème appliqué au lecteur réduit",
+			matrixRain: "économiseur d'écran pluie matrix (inactivité, 2 min par défaut)"
+		}
+	};
+
+	function t(key) {
+		return TRANSLATIONS[SYSTEM_LOCALE][key] || TRANSLATIONS.en[key] || key;
+	}
+
+	// ===== FEATURE REGISTRY =====
+	// The single source of truth for every toggleable feature: its default,
+	// its settings-panel row, and the setup call it gets at init. Previously
+	// these three things lived in three separate places (DEFAULT_SETTINGS,
+	// the waitFor init list, and buildSettingsPanel's row list) that had to
+	// be kept in sync by hand on every new feature — this is that sync, done
+	// once. `setup` is a hoisted function reference (safe to use here even
+	// though those functions are defined later in the file — function
+	// declarations are hoisted before this line runs), called unconditionally
+	// at init; each feature's own listeners are the ones that check
+	// `settings[key]` before actually doing anything, exactly as before.
+	// `onToggle` runs any extra live side effect a checkbox needs beyond just
+	// flipping the setting (e.g. stopping Matrix rain the moment it's
+	// unchecked). `hasDelay` marks the one row (Matrix rain) that also shows
+	// a numeric delay input.
 	//
 	// Always-on features with no user-facing toggle (ASCII cover art, the
 	// glitch flash, vim nav, the download-bar tooltip, play history
 	// tracking) are NOT here — they're called directly in the init list
 	// below, same as before.
-	// ---------------------------------------------------------------------
+	// ===================================
 	var FEATURE_REGISTRY = [
-		{ key: "boot", label: "séquence de démarrage au lancement", default: true },
-		{ key: "pulse", label: "pulsation lecture en cours (couleur + tempo)", default: true, setup: function () { setupNowPlayingPulse(); }, onToggle: function () { applyPulseVisuals(); } },
-		{ key: "transitions", label: "transitions de page", default: true, setup: function () { setupPageTransitions(); } },
-		{ key: "typewriter", label: "titres façon machine à écrire", default: true, setup: function () { setupTypewriter(); } },
-		{ key: "palette", label: "palette de commandes (ctrl+maj+k)", default: true, setup: function () { setupCommandPalette(); } },
-		{ key: "tempoMarkers", label: "marqueurs de tempo sur la barre de lecture", default: true, setup: function () { setupTempoMarkersWatchdog(); }, onToggle: function () { renderTempoMarkers(); } },
-		{ key: "visualizer", label: "visualiseur de fréquence (synchronisé à la musique)", default: true, setup: function () { setupVisualizer(); } },
-		{ key: "streamBadge", label: "flash \"connexion établie\"", default: true, setup: function () { setupStreamBadge(); } },
-		{ key: "cursor", label: "curseur bloc terminal", default: true, setup: function () { setupCursor(); }, onToggle: function () { applyCursorSetting(); } },
-		{ key: "crtScanlines", label: "overlay lignes de balayage CRT", default: true, setup: function () { setupCrt(); }, onToggle: function () { applyCrtSetting(); } },
+		{ key: "boot", label: t("boot"), default: true },
+		{ key: "pulse", label: t("pulse"), default: true, setup: function () { setupNowPlayingPulse(); }, onToggle: function () { applyPulseVisuals(); } },
+		{ key: "transitions", label: t("transitions"), default: true, setup: function () { setupPageTransitions(); } },
+		{ key: "typewriter", label: t("typewriter"), default: true, setup: function () { setupTypewriter(); } },
+		{ key: "palette", label: t("palette"), default: true, setup: function () { setupCommandPalette(); } },
+		{ key: "tempoMarkers", label: t("tempoMarkers"), default: true, setup: function () { setupTempoMarkersWatchdog(); }, onToggle: function () { renderTempoMarkers(); } },
+		{ key: "visualizer", label: t("visualizer"), default: true, setup: function () { setupVisualizer(); } },
+		{ key: "streamBadge", label: t("streamBadge"), default: true, setup: function () { setupStreamBadge(); } },
+		{ key: "cursor", label: t("cursor"), default: true, setup: function () { setupCursor(); }, onToggle: function () { applyCursorSetting(); } },
+		{ key: "crtScanlines", label: t("crtScanlines"), default: true, setup: function () { setupCrt(); }, onToggle: function () { applyCrtSetting(); } },
 		{
 			key: "miniPlayerTheme",
-			label: "thème appliqué au lecteur réduit",
+			label: t("miniPlayerTheme"),
 			default: true,
 			setup: function () { setupMiniPlayerTheme(); },
 			onToggle: function (checked) { applyMiniPlayerThemeSetting(checked); }
 		},
 		{
 			key: "matrixRain",
-			label: "économiseur d'écran pluie matrix (inactivité)",
+			label: t("matrixRain"),
 			default: true,
 			setup: function () { setupMatrixRain(); },
 			onToggle: function (checked) { if (!checked) stopMatrixRain(); },
@@ -225,6 +271,8 @@
 
 	function applyOsClass() {
 		currentOs = detectOs();
+		// Update the font stack now that we know the OS
+		TERM_FONT_STACK = getTERMFontStack(currentOs);
 		var root = document.documentElement;
 		for (var k in OS_CLASSES) {
 			if (Object.prototype.hasOwnProperty.call(OS_CLASSES, k)) {

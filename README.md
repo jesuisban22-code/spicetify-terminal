@@ -88,15 +88,36 @@ spicetify config current_theme Terminal color_scheme terminal
 spicetify apply
 ```
 
-**Windows** (PowerShell):
+**Windows** (PowerShell, **run as Administrator**):
 
 ```powershell
-git clone https://github.com/jesuisban22-code/spicetify-terminal.git "$(Split-Path (spicetify -c))\Themes\Terminal"
+# Get the Spicetify config directory
+$configPath = spicetify -c
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Spicetify CLI not found or not working"
+    Write-Host "Install Spicetify first: https://spicetify.app"
+    exit 1
+}
+
+# Build the theme path
+$themePath = Join-Path (Split-Path $configPath) "Themes\Terminal"
+Write-Host "Installing Terminal theme to: $themePath"
+
+# Clone the repository
+git clone https://github.com/jesuisban22-code/spicetify-terminal.git $themePath
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Failed to clone repository. Make sure Git is installed and in PATH."
+    exit 1
+}
+
+# Configure and apply
 spicetify config current_theme Terminal color_scheme terminal
 spicetify apply
+
+Write-Host "✓ Terminal theme installed and applied successfully!" -ForegroundColor Green
 ```
 
-On Windows the target folder is usually `%APPDATA%\spicetify\Themes\Terminal`.
+On Windows the target folder is usually `%APPDATA%\spicetify\Themes\Terminal`. If you don't have Git installed, download it from [git-scm.com](https://git-scm.com).
 
 To update a manual install, run `git pull` in that `Themes/Terminal` folder, then `spicetify apply`.
 
